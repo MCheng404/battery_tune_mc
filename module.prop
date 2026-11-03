@@ -1,0 +1,6 @@
+id=battery_tune_mc
+name=电池解容工具箱
+version=v1.0.0
+versionCode=1
+author=
+description=电池解容 · 云控屏蔽 · APL 自适应功率爬坡 · 5 档刷新率 ｜ 仅适配 小米15 Pro (haotian) ｜ 刷新率: 120/132/144/156/165Hz
