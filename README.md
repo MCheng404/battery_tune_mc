@@ -195,7 +195,4 @@ The DTBO payloads are prebuilt. At flash time, `scripts/build_dtbo.sh` wraps the
 ## Credits and license
 
 - Author: **MaoCat** (`@Maocat`)
-- Based on the MIT-licensed **Dimples1337** upstream project. Upstream copyright remains with its original authors.
 - License: **MIT**. See `LICENSE`.
-
-This README is repository documentation only and is not included in the module zip.
