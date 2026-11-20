@@ -9,7 +9,7 @@
 
 # ============================================================================
 XBT=/data/adb/modules/battery_tune_mc
-LOG="${LOG:-/data/local/tmp/xt_toolbox.log}"
+LOG="${LOG:-/data/local/tmp/battery_tune_mc.log}"
 PIDF="$XBT/state/cg.pid"
 LASTF="$XBT/state/wd_last_restart"
 

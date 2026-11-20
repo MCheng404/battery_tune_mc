@@ -104,12 +104,6 @@ else
   sh $XBT/scripts/cycle_guard.sh stop >>"$LOG" 2>&1
 fi
 
-BAT=/sys/class/power_supply/battery
-_HEALTH=$(awk -v c="$(cat $BAT/charge_full 2>/dev/null || echo 0)" -v d="$(cat $BAT/charge_full_design 2>/dev/null || echo 0)" 'BEGIN{ if (d>0) printf "%.1f", c/d*100; else printf "?" }')
-_CYCLE=$(cat /sys/class/xm_power/fg_master/cyclecount 2>/dev/null)
-[ -z "$_CYCLE" ] && _CYCLE=$(cat $BAT/cycle_count 2>/dev/null)
-update_desc "$_HEALTH" "$_CYCLE" "$UNLOCK"
-
 _log_sz=$(wc -c < "$LOG" 2>/dev/null)
 case "$_log_sz" in
   ''|*[!0-9]*) ;;

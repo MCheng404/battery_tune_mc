@@ -26,7 +26,25 @@ case "$_ma_raw" in
   ''|*[!0-9-]*) _ma="" ;;
   *) _ma=$(awk -v r="$_ma_raw" 'BEGIN { printf "%d", r / 1000 }') ;;
 esac
-case "$_soc" in ''|*[!0-9]*) _soc="" ;; esac
+case "$_ma" in
+  ''|*[!0-9-]*) _ma="" ;;
+  *) _abs=${_ma#-}; { [ "$_abs" -le 30000 ]; } 2>/dev/null || _ma="" ;;
+esac
+unset _abs 2>/dev/null
+case "$_soc" in
+  ''|*[!0-9]*) _soc="" ;;
+  *) { [ "$_soc" -ge 0 ] && [ "$_soc" -le 100 ]; } 2>/dev/null || _soc="" ;;
+esac
+# Sensor glitch guard: a single bogus sample must not reach the UI as a real
+# reading. Ranges are physical plausibility bounds, not control thresholds.
+case "$_tmp" in
+  ''|*[!0-9-]*) _tmp="" ;;
+  *) { [ "$_tmp" -ge -200 ] && [ "$_tmp" -le 1500 ]; } 2>/dev/null || _tmp="" ;;
+esac
+case "$_v" in
+  ''|*[!0-9]*) _v="" ;;
+  *) { [ "$_v" -ge 2000000 ] && [ "$_v" -le 6000000 ]; } 2>/dev/null || _v="" ;;
+esac
 if [ -n "$_ma" ] && [ -n "$_v" ]; then
   _ma_abs=${_ma#-}
   _battery_power_w=$(awk -v i="$_ma_abs" -v v="$_v" 'BEGIN { printf "%.1f", i * v / 1000000000 }')
@@ -58,28 +76,41 @@ echo "thermal_remove=$(cat /sys/class/xm_power/charger/charger_thermal/wired_the
 echo "ctrl_limit=$(cat /sys/class/xm_power/charger/charger_thermal/wired_ctrl_limit 2>/dev/null)"
 
 _cgpid=$(cat $XBT/state/cg.pid 2>/dev/null)
-case "$_cgpid" in ''|*[!0-9]*) _cgalive=0 ;; *)
-  if kill -0 "$_cgpid" 2>/dev/null; then _cgalive=1; else _cgalive=0; fi ;;
-esac
+if pid_alive "$_cgpid" "charge_guard.sh"; then _cgalive=1; else _cgalive=0; fi
 echo "charge_guard_alive=$_cgalive"
 echo "charge_guard_ok=$_cgalive"
-echo "watchdog_alive=$(timeout 5 pgrep -f 'battery_tune_mc/scripts/guard_watchdog\.sh' 2>/dev/null | head -n1)"
+watchdog_alive=$(xbt_pids 'battery_tune_mc/scripts/guard_watchdog\.sh' 'battery_tune_mc/scripts/guard_watchdog.sh' | head -n1)
+echo "watchdog_alive=$watchdog_alive"
 
 _apl_pid=$(cat $XBT/state/apl.pid 2>/dev/null)
-case "$_apl_pid" in ''|*[!0-9]*) _apl_live=0 ;; *)
-  if kill -0 "$_apl_pid" 2>/dev/null; then _apl_live=1; else _apl_live=0; fi ;;
-esac
+if pid_alive "$_apl_pid" "apl.sh"; then _apl_live=1; else _apl_live=0; fi
 echo "apl_alive=$_apl_live"
 echo "apl_pid=$_apl_pid"
 echo "apl_target_ma=$(cat $XBT/state/apl_target_ma 2>/dev/null)"
 echo "apl_cap_ma=$(dt_curr_cap_ma 2>/dev/null)"
 echo "apl_locked=$( [ -f $XBT/state/apl_lock_until ] && echo 1 || echo 0 )"
-echo "apl_profile=$( [ -f $XBT/state/apl_profile.$(cfg_get dev_code unknown).kv ] && echo 1 || echo 0 )"
-echo "apl_best_ma=$(_pb=$XBT/state/apl_profile.$(cfg_get dev_code unknown).kv; [ -f "$_pb" ] && grep -a '^b[0-9]=' "$_pb" 2>/dev/null | cut -d= -f2 | awk '{if($1+0>m)m=$1+0}END{if(m>0)print m}')"
-echo "apl_reset_reason=$(grep -a '^_reset_' $XBT/state/apl_profile.$(cfg_get dev_code unknown).kv 2>/dev/null | tail -n1 | cut -d= -f2-)"
+_dev=$(cfg_get dev_code unknown)
+_pb="$XBT/state/apl_profile.$_dev.kv"
+echo "apl_profile=$( [ -f "$_pb" ] && echo 1 || echo 0 )"
+echo "apl_best_ma=$( [ -f "$_pb" ] && grep -a '^b[0-9]=' "$_pb" 2>/dev/null | cut -d= -f2 | awk '{if($1+0>m)m=$1+0}END{if(m>0)print m}')"
+echo "apl_reset_reason=$(grep -a '^_reset_' "$_pb" 2>/dev/null | tail -n1 | cut -d= -f2-)"
 
 echo "freepps=$(cfg_get freepps 0)"
 echo "freepps_runtime=$(cat /data/adb/modules/freepps/free 2>/dev/null)"
+echo "touch_sample=$(cfg_get touch_sample 1)"
+_touch_live=$(sh $XBT/scripts/touch.sh isactive 2>/dev/null)
+echo "touch_active=${_touch_live:-0}"
+echo "tw_enable=$(cfg_get tw_enable 0)"
+echo "tw_limit=$(tw_limit_c)"
+echo "tw_resume=$(tw_resume_c)"
+echo "tw_power_w=$(tw_power_w)"
+echo "tw_active=$(cat $XBT/state/tw_active 2>/dev/null)"
+echo "dyn_enable=$(cfg_get dyn_enable 0)"
+echo "dyn_mode=$(dyn_mode)"
+echo "policy_target_ma=$_target"
+echo "policy_applied_ma=$(cat $XBT/state/policy_applied_ma 2>/dev/null)"
+echo "policy_suspended=$(cat $XBT/state/policy_suspended 2>/dev/null)"
+echo "dyn_cut=$(cat $XBT/state/dyn_cut 2>/dev/null)"
 echo "dev_code=$DEV_CODE"
 echo "dev_name=$DEV_NAME"
 

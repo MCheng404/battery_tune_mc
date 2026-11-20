@@ -79,6 +79,86 @@ chg_state_cn() {
   esac
 }
 
+policy_apply_once() {
+  tw_update_latch
+  case "$(cat "$BAT/status" 2>/dev/null)" in
+    *Charging*|Full) ;;
+    *)
+      if [ "$(cat "$XBT/state/policy_suspended" 2>/dev/null)" = "1" ]; then
+        echo 1 > "$XBT/state/policy_was_on" 2>/dev/null
+      else
+        rm -f "$XBT/state/policy_applied_ma" "$XBT/state/policy_wall_applied" 2>/dev/null
+        echo 1 > "$XBT/state/policy_force" 2>/dev/null
+        echo 1 > "$XBT/state/policy_was_on" 2>/dev/null
+      fi
+      return 0
+      ;;
+  esac
+  _v=$(read_voltage_uv)
+  case "$_v" in ''|*[!0-9]*) _v=4300000 ;; esac
+  _want=$(policy_target_ma "$_v")
+  case "$_want" in ''|*[!0-9]*) return 1 ;; esac
+
+  _wall=$(cat "$XBT/state/tw_active" 2>/dev/null)
+  case "$_wall" in 1) ;; *) _wall=0 ;; esac
+  if policy_cut_want; then _cut=1; else _cut=0; fi
+  _prev_cut=$(cat "$XBT/state/policy_suspended" 2>/dev/null)
+  case "$_prev_cut" in 0|1) ;; *) _prev_cut="" ;; esac
+  _force=0
+  [ -f "$XBT/state/policy_force" ] && _force=1
+
+  if policy_suspend_set "$_cut"; then
+    _susp_ok=1
+    if [ "$_cut" != "$_prev_cut" ]; then
+      log "policy: suspend=${_cut} target=${_want}mA wall=${_wall} mode=$(dyn_mode) temp=$(cat "$BAT/temp" 2>/dev/null) soc=$(cat "$BAT/capacity" 2>/dev/null)"
+    fi
+  else
+    _susp_ok=0
+    log "policy: suspend helper unavailable, fallback target=${_want}mA"
+  fi
+
+  _applied_prev=$(cat "$XBT/state/policy_applied_ma" 2>/dev/null)
+  _wall_prev=$(cat "$XBT/state/policy_wall_applied" 2>/dev/null)
+  _need_curr=0
+  if [ "$_force" = "1" ] || [ "$_prev_cut" = "1" ] ||
+     [ "$_want" != "$_applied_prev" ] || [ "$_wall" != "$_wall_prev" ]; then
+    _need_curr=1
+  fi
+  if [ "$_cut" = "0" ] || [ "$_susp_ok" != "1" ]; then
+    if [ "$_need_curr" = "1" ]; then
+      if [ "$_force" = "1" ] || [ "$_prev_cut" = "1" ] || cg_gap_ok; then
+        if direct_set_current_ma "$_want" "$(thermal_target)" 0 >/dev/null 2>&1; then
+          cg_note_write
+          echo "$_want" > "$XBT/state/policy_applied_ma" 2>/dev/null
+          [ "$_want" != "$_applied_prev" ] && log "policy: apply target=${_want}mA (was ${_applied_prev:-none})"
+        else
+          log "policy: apply failed target=${_want}mA"
+        fi
+      fi
+    fi
+  fi
+
+  echo "$_wall" > "$XBT/state/policy_wall_applied" 2>/dev/null
+  rm -f "$XBT/state/policy_force" "$XBT/state/tw_changed" 2>/dev/null
+  echo 1 > "$XBT/state/policy_was_on" 2>/dev/null
+  return 0
+}
+
+policy_restore() {
+  policy_suspend_set 0
+  rm -f "$XBT/state/policy_force" "$XBT/state/policy_applied_ma" \
+        "$XBT/state/policy_wall_applied" "$XBT/state/tw_active" "$XBT/state/tw_changed" \
+        "$XBT/state/dyn_cut" 2>/dev/null
+  [ -f "$XBT/state/policy_was_on" ] || return 0
+  rm -f "$XBT/state/policy_was_on" 2>/dev/null
+  _base=$(tier_target_ma inf)
+  case "$_base" in ''|*[!0-9]*) return 0 ;; esac
+  direct_set_current_ma "$_base" "$(thermal_target)" 0 >/dev/null 2>&1 && cg_note_write
+  rm -f "$XBT/state/inf_settled" "$XBT/state/inf_settle_ts" "$XBT/state/inf_selfcheck_ts" "$XBT/state/inf_override_cnt" 2>/dev/null
+  log "policy: disabled, restore target=${_base}mA"
+  return 0
+}
+
 apply_once() {
 
   _sra="$XBT/state/thermal_restore_active"
@@ -86,6 +166,13 @@ apply_once() {
     rm -f "$_sra" 2>/dev/null
     log "charge_guard: removed stale thermal_restore_active (dead switch)"
   fi
+
+  if policy_on; then
+    policy_apply_once
+    echo 1 > "$XBT/state/direct_control_active" 2>/dev/null
+    return $?
+  fi
+  policy_restore
 
   _cur_nodes=$(direct_current_nodes)
   if [ -z "$_cur_nodes" ]; then
@@ -297,7 +384,21 @@ show_status() {
   echo
 }
 
-log "charge_guard: started (pid $$, once=$ONCE, v2.1.1, $(grep '^version=' $XBT/module.prop 2>/dev/null | cut -d= -f2), dev=$(cfg_get dev_code ''))"
+log "charge_guard: started (pid $$, once=$ONCE, $(grep '^version=' $XBT/module.prop 2>/dev/null | cut -d= -f2), dev=$(cfg_get dev_code ''))"
+
+# Only long-lived workers take part in arbitration; status/once/stop are
+# short-lived helpers and must never be killed or counted as a peer.
+guard_peer_pids() {
+  for _p in $(xbt_pids 'battery_tune_mc/scripts/charge_guard\.sh' 'battery_tune_mc/scripts/charge_guard.sh'); do
+    [ "$_p" = "$$" ] && continue
+    kill -0 "$_p" 2>/dev/null || continue
+    _gc=$(tr '\0' ' ' < "/proc/$_p/cmdline" 2>/dev/null)
+    case "$_gc" in
+      *'charge_guard.sh status'*|*'charge_guard.sh once'*|*'charge_guard.sh stop'*) continue ;;
+    esac
+    echo "$_p"
+  done
+}
 case "$ONCE" in
   status)
     show_status
@@ -308,30 +409,20 @@ case "$ONCE" in
     exit $?
     ;;
   stop)
-
+    _pids=$(guard_peer_pids)
     _n=0
-    if command -v pgrep >/dev/null 2>&1; then
-      for _p in $(timeout 5 pgrep -f 'battery_tune_mc/scripts/charge_guard\.sh' 2>/dev/null); do
-        [ "$_p" = "$$" ] && continue
-        _cl=$(timeout 1 cat "/proc/$_p/cmdline" 2>/dev/null | tr '\0' ' ')
-        case "$_cl" in
-          *charge_guard.sh\ status*|*charge_guard.sh\ once*|*charge_guard.sh\ stop*) continue ;;
-        esac
-        kill -TERM "$_p" 2>/dev/null && _n=$((_n + 1))
-      done
-      sleep 0.6
-
-      for _p in $(timeout 5 pgrep -f 'battery_tune_mc/scripts/charge_guard\.sh' 2>/dev/null); do
-        [ "$_p" = "$$" ] && continue
-        _cl=$(timeout 1 cat "/proc/$_p/cmdline" 2>/dev/null | tr '\0' ' ')
-        case "$_cl" in
-          *charge_guard.sh\ status*|*charge_guard.sh\ once*|*charge_guard.sh\ stop*) continue ;;
-        esac
-        kill -9 "$_p" 2>/dev/null
-      done
-    fi
+    for _p in $_pids; do
+      kill -TERM "$_p" 2>/dev/null && _n=$((_n + 1))
+    done
+    [ -n "$_pids" ] && sleep 0.6
+    for _p in $_pids; do
+      kill -0 "$_p" 2>/dev/null && kill -9 "$_p" 2>/dev/null
+    done
 
     rm -f "$XBT/state/inf_settled" "$XBT/state/inf_settle_ts" "$XBT/state/inf_selfcheck_ts" 2>/dev/null
+    policy_suspend_set 0
+    rm -f "$XBT/state/policy_was_on" "$XBT/state/policy_suspended" "$XBT/state/policy_applied_ma" \
+          "$XBT/state/policy_wall_applied" "$XBT/state/tw_active" "$XBT/state/tw_changed" "$XBT/state/dyn_cut" 2>/dev/null
     log "charge_guard: stop -> killed $_n instance(s)"
     echo "charge_guard: 已停止 $_n 个长驻实例"
     exit 0
@@ -340,37 +431,28 @@ esac
 
 #
 
-if command -v pgrep >/dev/null 2>&1; then
-  _me=$$
-  _other=""
-  for _w in 1 2 3; do
-    _other=""
-    for _p in $(timeout 5 pgrep -f 'battery_tune_mc/scripts/charge_guard\.sh' 2>/dev/null); do
-      [ "$_p" = "$_me" ] && continue
-      kill -0 "$_p" 2>/dev/null || continue
-      _cl=$(timeout 1 cat "/proc/$_p/cmdline" 2>/dev/null | tr '\0' ' ')
-
-      case "$_cl" in
-        *charge_guard.sh\ status*|*charge_guard.sh\ once*) ;;
-        *charge_guard.sh*) _other="$_p" ;;
-      esac
-      [ -n "$_other" ] && break
-    done
-    [ -z "$_other" ] && break
-    sleep 0.5
+_peers=""
+for _w in 1 2; do
+  _peers=$(guard_peer_pids)
+  [ -n "$_peers" ] && break
+  sleep 0.4
+done
+if [ -n "$_peers" ]; then
+  _min=""
+  for _p in $_peers; do
+    if [ -z "$_min" ] || [ "$_p" -lt "$_min" ] 2>/dev/null; then _min="$_p"; fi
   done
-
-  if [ -n "$_other" ] && [ "$_other" -lt "$_me" ] 2>/dev/null; then
-    log "charge_guard: elder instance alive (pid $_other < $_me), yield self=$_me"
+  if [ -n "$_min" ] && [ "$_min" -lt "$$" ] 2>/dev/null; then
+    log "charge_guard: elder instance alive (pid $_min < $$), yield self=$$"
     exit 0
-  elif [ -n "$_other" ]; then
-    log "charge_guard: self=$_me takes over (younger $ _other=$_other will yield)"
   fi
+  log "charge_guard: self=$$ is the lowest pid, taking over (peers: $_peers)"
 fi
 
 rm -f "$XBT/state/inf_settled" "$XBT/state/inf_settle_ts" "$XBT/state/inf_selfcheck_ts" "$XBT/state/inf_settle_fail" 2>/dev/null
 
 mkdir -p "$XBT/state" 2>/dev/null
+rm -f "$XBT/state/policy_suspended" 2>/dev/null
 echo $$ > "$XBT/state/cg.pid" 2>/dev/null
 date +%s > "$XBT/state/cg_started_ts" 2>/dev/null
 

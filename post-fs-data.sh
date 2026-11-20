@@ -24,4 +24,8 @@ fi
 if [ "$(cfg_get cloud_guard 1)" = "1" ]; then
   sh $XBT/scripts/cloud_guard.sh early >>"$LOG" 2>&1
 fi
+
+if [ "$(cfg_get touch_sample 1)" = "1" ]; then
+  sh $XBT/scripts/touch.sh boot >>"$LOG" 2>&1
+fi
 exit 0

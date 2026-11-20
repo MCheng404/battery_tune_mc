@@ -6,6 +6,9 @@ BK=/sdcard/Download/xt_uninstall_backup_$(date +%Y%m%d_%H%M%S)
 . $XBT/scripts/common.sh 2>/dev/null
 
 mkdir -p "$BK" 2>/dev/null
+if [ -f "$XBT/scripts/touch.sh" ]; then
+  sh "$XBT/scripts/touch.sh" stop >>"$LOG" 2>&1
+fi
 cp -f "$XBT/config/settings.conf" "$BK/" 2>/dev/null
 cp -f "$XBT/state/direct_current_defaults" "$BK/" 2>/dev/null
 cp -f "$XBT/state/direct_control_defaults" "$BK/" 2>/dev/null
@@ -228,9 +231,9 @@ _devc0=$(cfg_get dev_code "")
 
 _mine0=""
 _dtbo_choice0=$(cat "$XBT/state/dtbo_choice" 2>/dev/null)
-_hz0=$(echo "$_dtbo_choice0" | sed -n 's/^[a-z]*-_\([0-9]*\)$/\1/p')
+_hz0=$(echo "$_dtbo_choice0" | sed -n 's/^[a-z]*-\([0-9]*\)$/\1/p')
 case "$_hz0" in
-  120|132|144|156|165)
+  120|132|144|165)
     [ -f "$XBT/dtbo/${_hz0}hz.dtb" ] && _mine0="$XBT/dtbo/${_hz0}hz.dtb" ;;
 esac
 if [ -n "$_devc0" ] && [ -n "$_mine0" ]; then
@@ -258,10 +261,10 @@ if [ -n "$_devc0" ] && [ -n "$_mine0" ]; then
 fi
 
 log "uninstall: done (state backup at $BK)"
-cp -f /data/local/tmp/xt_toolbox.log "$BK/xt_toolbox.log" 2>/dev/null
-cp -f /data/local/tmp/xt_toolbox.log.rot "$BK/xt_toolbox.log.rot" 2>/dev/null
+cp -f /data/local/tmp/battery_tune_mc.log "$BK/battery_tune_mc.log" 2>/dev/null
+cp -f /data/local/tmp/battery_tune_mc.log.rot "$BK/battery_tune_mc.log.rot" 2>/dev/null
 
-rm -f /data/local/tmp/xt_toolbox.log /data/local/tmp/xt_toolbox.log.rot 2>/dev/null
+rm -f /data/local/tmp/battery_tune_mc.log /data/local/tmp/battery_tune_mc.log.rot 2>/dev/null
 rm -f /data/local/tmp/xt_restore_list.txt /data/local/tmp/dtbo_pad_install.img 2>/dev/null
 rm -f /data/local/tmp/dtbo_pad.img /data/local/tmp/xt_dtbo_list.txt 2>/dev/null
 rm -f /data/local/tmp/xt_charge_guard.pid /data/local/tmp/xt_cloud_guard.pid \

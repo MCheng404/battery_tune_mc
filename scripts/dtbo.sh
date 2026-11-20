@@ -17,6 +17,22 @@ blk_sha() { dd if="$1" bs=1M 2>/dev/null | sha256sum | awk '{print $1}'; }
 
 blk_md5() { dd if="$1" bs=1M 2>/dev/null | md5sum | awk '{print $1}'; }
 
+part_size64() {
+  _ps_dev="$1"
+  _ps_sz=$(blockdev --getsize64 "$_ps_dev" 2>/dev/null)
+  case "$_ps_sz" in
+    ''|*[!0-9]*) ;;
+    *) echo "$_ps_sz"; return 0 ;;
+  esac
+  _ps_node=$(basename "$(readlink -f "$_ps_dev" 2>/dev/null)" 2>/dev/null)
+  [ -n "$_ps_node" ] || return 1
+  _ps_sec=$(cat "/sys/class/block/$_ps_node/size" 2>/dev/null)
+  case "$_ps_sec" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  echo $((_ps_sec * 512))
+}
+
 show_status() {
   echo "[两槽状态]"
   echo "当前卡槽: _$(slot_letter)"
@@ -164,7 +180,7 @@ do_flash() {
   [ -e "$dev" ] || { echo "分区不存在: $dev"; return 1; }
 
   fsz=$(stat -c %s "$f" 2>/dev/null)
-  dsz=$(blockdev --getsize64 "$dev" 2>/dev/null)
+  dsz=$(part_size64 "$dev")
   echo "目标分区: $dev ($dsz bytes)"
   echo "镜像文件: $f ($fsz bytes)"
   if [ -n "$dsz" ] && [ "$fsz" -gt "$dsz" ]; then
@@ -243,7 +259,8 @@ do_flash() {
       fi
     fi
 
-    [ "$_used_pad" = "1" ] && rm -f "$_pad" 2>/dev/null
+    if [ "$_used_pad" = "1" ]; then rm -f "$_pad" 2>/dev/null; fi
+    return 0
   else
     echo "dd 写入失败!"
     [ "$_used_pad" = "1" ] && rm -f "$_pad" 2>/dev/null
@@ -271,15 +288,15 @@ autobackup() {
 
 build_and_flash() {
   hz="$1"; s="${2:-$(slot_letter)}"
-  case "$hz" in 120|132|144|156|165) ;; *)
-    echo "帧率参数必须是 120/132/144/156/165"; return 1 ;; esac
+  case "$hz" in 120|132|144|165) ;; *)
+    echo "帧率参数必须是 120/132/144/165"; return 1 ;; esac
   dtb="$XBT/dtbo/${hz}hz.dtb"
   [ -f "$dtb" ] || { echo "载荷缺失: $dtb"; return 1; }
   dev=$(slot_dev "$s")
   [ -e "$dev" ] || { echo "分区不存在: $dev"; return 1; }
   img=/data/local/tmp/dtbo_${hz}hz_webui.img
   rm -f "$img" 2>/dev/null
-  dsz=$(blockdev --getsize64 "$dev" 2>/dev/null)
+  dsz=$(part_size64 "$dev")
   echo "-> 构建 ${hz}Hz DTBO 镜像 ..."
   if ! sh "$XBT/scripts/build_dtbo.sh" "$dtb" "$img" "${dsz:-}"; then
     echo "build-failed-${hz}" > "$XBT/state/dtbo_choice" 2>/dev/null
@@ -303,7 +320,7 @@ case "$1" in
   flashlocal)
     _choice=$(cat "$XBT/state/dtbo_choice" 2>/dev/null)
     _hz=$(echo "$_choice" | sed -n 's/^[a-z]*-\([0-9]*\)$/\1/p')
-    case "$_hz" in 120|132|144|156|165) ;;
+    case "$_hz" in 120|132|144|165) ;;
       *) echo "没有已选帧率记录，请用: dtbo.sh build <hz> [slot]"; exit 1 ;;
     esac
     build_and_flash "$_hz" "${2:-$(slot_letter)}"

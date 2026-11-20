@@ -2,7 +2,7 @@
 
 XBT=/data/adb/modules/battery_tune_mc
 CONF=$XBT/config/settings.conf
-LOG=/data/local/tmp/xt_toolbox.log
+LOG=/data/local/tmp/battery_tune_mc.log
 
 DEV_CODE=$(grep -E '^dev_code=' "$CONF" 2>/dev/null | tail -n 1 | cut -d= -f2-)
 case "$DEV_CODE" in
@@ -94,20 +94,33 @@ if [ -z "$XBT_TIMEOUT" ]; then
 fi
 
 xbt_pids() {
-
   _pat="$1"
+  _lit="${2:-$1}"
   if command -v pgrep >/dev/null 2>&1; then
-    pgrep -f "$_pat" 2>/dev/null | grep -v "^$$\$"
-  else
-
-    for _p in /proc/[0-9]*; do
-      _pid=${_p#/proc/}
+    for _pid in $(pgrep -f "$_pat" 2>/dev/null); do
       [ "$_pid" = "$$" ] && continue
-      case "$(_xbt_run 1 cat "$_p/cmdline" 2>/dev/null | tr '\0' ' ')" in
-        *"$2"*) echo "$_pid" ;;
-      esac
+      _cmd=$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null)
+      case "$_cmd" in *"$_lit"*) echo "$_pid" ;; esac
     done
+    return 0
   fi
+  for _p in /proc/[0-9]*; do
+    _pid=${_p#/proc/}
+    [ "$_pid" = "$$" ] && continue
+    _cmd=$(tr '\0' ' ' < "$_p/cmdline" 2>/dev/null)
+    case "$_cmd" in *"$_lit"*) echo "$_pid" ;; esac
+  done
+}
+
+pid_alive() {
+  _pid="$1"; _tok="$2"
+  case "$_pid" in ''|*[!0-9]*) return 1 ;; esac
+  [ -d "/proc/$_pid" ] || return 1
+  kill -0 "$_pid" 2>/dev/null || return 1
+  [ -z "$_tok" ] && return 0
+  _cmd=$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null)
+  case "$_cmd" in *"$_tok"*) return 0 ;; esac
+  return 1
 }
 xbt_kill() {
 
@@ -159,31 +172,41 @@ cycle_real_capture() {
 
 cfg_get() {
   _k="$1"; _d="$2"
-  [ -f "$CONF" ] || { echo "$_d"; return; }
-  _v=$(grep -E "^${_k}=" "$CONF" 2>/dev/null | tail -n 1 | cut -d= -f2-)
-  if [ -n "$_v" ]; then echo "$_v"; else echo "$_d"; fi
+  case "$_k" in ''|*[!A-Za-z0-9_]*) printf '%s\n' "$_d"; return ;; esac
+  [ -f "$CONF" ] || { printf '%s\n' "$_d"; return; }
+  _v=$(awk -F= -v k="$_k" '{ if ($1==k) { v=$0; sub(/^[^=]*=/,"",v) } } END { if (v!="") print v }' "$CONF" 2>/dev/null)
+  if [ -n "$_v" ]; then printf '%s\n' "$_v"; else printf '%s\n' "$_d"; fi
 }
 
 cfg_set() {
   _k="$1"; _v="$2"
-  mkdir -p "$(dirname "$CONF")"
+  case "$_k" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
+  mkdir -p "$(dirname "$CONF")" "$XBT/state" 2>/dev/null
 
-  #   $XBT/state/*（last_real_cycle.txt / fv_default …），
+  # Serialize writers: concurrent WebUI toggles used to lose updates between
+  # the read-modify-write of sed -i. mkdir is atomic on every Android fs.
+  _lock="$XBT/state/.cfg.lock"
+  _try=0
+  while ! mkdir "$_lock" 2>/dev/null; do
+    _try=$((_try + 1))
+    [ "$_try" -ge 40 ] && { rm -rf "$_lock" 2>/dev/null; break; }
+    sleep 0.05
+  done
+  trap 'rmdir "$_lock" 2>/dev/null' EXIT HUP INT TERM
 
-  mkdir -p "$XBT/state" 2>/dev/null
-  touch "$CONF"
-
-  if [ -s "$CONF" ] && [ -n "$(tail -c 1 "$CONF" 2>/dev/null)" ]; then
-    echo "" >> "$CONF"
-  fi
-  if grep -qE "^${_k}=" "$CONF" 2>/dev/null; then
-
-    #
-
-    sed -i "s@^${_k}=.*@${_k}=${_v}@g" "$CONF"
+  _tmp="$CONF.tmp.$$"
+  if [ -f "$CONF" ]; then
+    awk -F= -v k="$_k" -v v="$_v" '
+      $1==k { if (!done) { print k"="v; done=1 } ; next }
+      { print }
+      END { if (!done) print k"="v }
+    ' "$CONF" > "$_tmp" 2>/dev/null
   else
-    echo "${_k}=${_v}" >> "$CONF"
+    printf '%s=%s\n' "$_k" "$_v" > "$_tmp" 2>/dev/null
   fi
+  if [ -s "$_tmp" ]; then mv -f "$_tmp" "$CONF"; else rm -f "$_tmp"; fi
+  rmdir "$_lock" 2>/dev/null
+  trap - 0 1 2 15
 }
 
 DT_CEIL_PATHS="/proc/device-tree/soc/mca_strategy_quick_charge/temp_para1
@@ -298,21 +321,6 @@ pss_guard_tick() {
     log "pss_dynamic: SOC=${_soc}% >= $((_low + _hys))% → PSS 启用（恢复电池健康度显示）"
   fi
   return 0
-}
-
-update_desc() {
-  _h="$1"; _c="$2"; _u="$3"
-  _mp=$XBT/module.prop
-  [ -f "$_mp" ] || return 0
-  if [ "$_u" = "1" ]; then _us="开"; else _us="关"; fi
-  if [ "$(cfg_get cloud_guard 1)" = "1" ]; then _cgs="开"; else _cgs="关"; fi
-  _cap_raw=$(cat /sys/class/power_supply/battery/charge_full 2>/dev/null)
-  case "$_cap_raw" in
-    ''|*[!0-9]*) _cap="?" ;;
-    *) _cap=$(((_cap_raw + 500) / 1000)) ;;
-  esac
-  sed -i "/^description=/d" "$_mp"
-  echo "description=健康:${_h}% ｜ 容量:${_cap}mAh ｜ 电池解容:${_us} ｜ 云控屏蔽:${_cgs} ｜ $DEV_NAME ($DEV_CODE)" >> "$_mp"
 }
 
 power_now() { echo inf; }
@@ -498,8 +506,175 @@ tier_target_ma() {
   esac
 }
 
-direct_tier_is_applied() {
-  _tier="$1"
+tw_limit_c() {
+  _v=$(cfg_get tw_limit 42)
+  case "$_v" in ''|*[!0-9]*) _v=42 ;; esac
+  [ "$_v" -lt 30 ] 2>/dev/null && _v=30
+  [ "$_v" -gt 55 ] 2>/dev/null && _v=55
+  echo "$_v"
+}
+
+tw_resume_c() {
+  _v=$(cfg_get tw_resume 38)
+  case "$_v" in ''|*[!0-9]*) _v=38 ;; esac
+  _l=$(tw_limit_c)
+  [ "$_v" -lt 25 ] 2>/dev/null && _v=25
+  [ "$_v" -ge "$_l" ] 2>/dev/null && _v=$((_l - 1))
+  echo "$_v"
+}
+
+tw_power_w() {
+  _v=$(cfg_get tw_power_w 25)
+  case "$_v" in ''|*[!0-9]*) _v=25 ;; esac
+  [ "$_v" -lt 5 ] 2>/dev/null && _v=5
+  [ "$_v" -gt 60 ] 2>/dev/null && _v=60
+  echo "$_v"
+}
+
+dyn_mode() {
+  _m=$(cfg_get dyn_mode balanced)
+  case "$_m" in gentle|balanced|aggressive|berserk) echo "$_m" ;; *) echo balanced ;; esac
+}
+
+policy_on() {
+  [ "$(cfg_get tw_enable 0)" = "1" ] && return 0
+  [ "$(cfg_get dyn_enable 0)" = "1" ] && return 0
+  return 1
+}
+
+policy_suspend_set() {
+  _v="$1"
+  _st=$(cat "$XBT/state/policy_suspended" 2>/dev/null)
+  case "$_v" in 1) ;; *) _v=0 ;; esac
+  [ "$_v" = "1" ] && [ "$_st" = "1" ] && return 0
+  [ "$_v" = "0" ] && [ "$_st" = "0" ] && return 0
+  service call vendor.xiaomi.hardware.micharge.IMiCharge/default 42 s16 "$_v" >/dev/null 2>&1 || return 1
+  echo "$_v" > "$XBT/state/policy_suspended" 2>/dev/null
+  return 0
+}
+
+policy_cut_want() {
+  _pcut=0
+  if [ "$(cfg_get tw_enable 0)" = "1" ] && [ "$(cat "$XBT/state/tw_active" 2>/dev/null)" = "1" ]; then
+    _pcut=1
+  fi
+  if [ "$(cfg_get dyn_enable 0)" = "1" ]; then
+    case "$(dyn_mode)" in
+      gentle)     _ts=36; _th=42; _ss=70; _sh=90 ;;
+      aggressive) _ts=42; _th=48; _ss=85; _sh=95 ;;
+      berserk)    _ts=45; _th=52; _ss=90; _sh=98 ;;
+      *)          _ts=39; _th=45; _ss=78; _sh=92 ;;
+    esac
+    _t=$(cat /sys/class/power_supply/battery/temp 2>/dev/null)
+    _soc=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null)
+    case "$_t" in ''|*[!0-9-]*) _t=350 ;; esac
+    case "$_soc" in ''|*[!0-9]*) _soc=50 ;; esac
+    if [ "$(cat "$XBT/state/dyn_cut" 2>/dev/null)" = "1" ]; then
+      if [ "$_t" -le $((_th * 10 - 20)) ] 2>/dev/null && [ "$_soc" -le $((_sh - 3)) ] 2>/dev/null; then
+        rm -f "$XBT/state/dyn_cut" 2>/dev/null
+      else
+        _pcut=1
+      fi
+    elif [ "$_t" -ge $((_th * 10)) ] 2>/dev/null || [ "$_soc" -ge "$_sh" ] 2>/dev/null; then
+      echo 1 > "$XBT/state/dyn_cut" 2>/dev/null
+      _pcut=1
+    fi
+  else
+    rm -f "$XBT/state/dyn_cut" 2>/dev/null
+  fi
+  [ "$_pcut" = "1" ]
+}
+
+tw_update_latch() {
+  [ "$(cfg_get tw_enable 0)" = "1" ] || {
+    rm -f "$XBT/state/tw_active" "$XBT/state/tw_changed" 2>/dev/null
+    return 0
+  }
+  _t=$(cat /sys/class/power_supply/battery/temp 2>/dev/null)
+  case "$_t" in ''|*[!0-9-]*) return 0 ;; esac
+  _on=$(( $(tw_limit_c) * 10 ))
+  _off=$(( $(tw_resume_c) * 10 ))
+  _st=$(cat "$XBT/state/tw_active" 2>/dev/null)
+  case "$_st" in 1) ;; *) _st=0 ;; esac
+  if [ "$_t" -ge "$_on" ] 2>/dev/null; then
+    _new=1
+  elif [ "$_t" -le "$_off" ] 2>/dev/null; then
+    _new=0
+  else
+    _new=$_st
+  fi
+  if [ "$_new" != "$_st" ]; then
+    echo "$_new" > "$XBT/state/tw_active" 2>/dev/null
+    echo 1 > "$XBT/state/tw_changed" 2>/dev/null
+  fi
+}
+
+policy_target_ma() {
+  _base=$(tier_target_ma inf)
+  case "$_base" in ''|*[!0-9]*) echo ""; return ;; esac
+  _v="${1:-$(read_voltage_uv)}"
+  case "$_v" in ''|*[!0-9]*) _v=4300000 ;; esac
+  [ "$_v" -lt 3000000 ] 2>/dev/null && _v=4300000
+  [ "$_v" -gt 5000000 ] 2>/dev/null && _v=4300000
+  _desired=$_base
+
+  if [ "$(cfg_get dyn_enable 0)" = "1" ]; then
+    _m=$(dyn_mode)
+    case "$_m" in
+      gentle)     _mw=45; _ts=36; _th=42; _mp=55; _ss=70; _sh=90; _sm=50; _fl=1500 ;;
+      aggressive) _mw=75; _ts=42; _th=48; _mp=75; _ss=85; _sh=95; _sm=70; _fl=3500 ;;
+      berserk)    _mw=90; _ts=45; _th=52; _mp=85; _ss=90; _sh=98; _sm=80; _fl=5000 ;;
+      *)          _mw=60; _ts=39; _th=45; _mp=65; _ss=78; _sh=92; _sm=60; _fl=2500 ;;
+    esac
+    _cap=$((_mw * 1000000000 / _v))
+    [ "$_cap" -lt "$_desired" ] && _desired=$_cap
+
+    _t=$(cat /sys/class/power_supply/battery/temp 2>/dev/null)
+    case "$_t" in ''|*[!0-9-]*) _t=350 ;; esac
+    _tp=100
+    if [ "$_t" -ge $((_th * 10)) ] 2>/dev/null; then
+      _tp=$_mp
+    elif [ "$_t" -gt $((_ts * 10)) ] 2>/dev/null; then
+      _span=$(((_th - _ts) * 10))
+      _pos=$((_t - _ts * 10))
+      _tp=$((100 - (100 - _mp) * _pos / _span))
+    fi
+
+    _soc=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null)
+    case "$_soc" in ''|*[!0-9]*) _soc=50 ;; esac
+    _sp=100
+    if [ "$_soc" -ge "$_sh" ] 2>/dev/null; then
+      _sp=$_sm
+    elif [ "$_soc" -gt "$_ss" ] 2>/dev/null; then
+      _sp=$((100 - (100 - _sm) * (_soc - _ss) / (_sh - _ss)))
+    fi
+
+    _vp=100
+    if [ "$_v" -ge 4500000 ] 2>/dev/null; then
+      _vp=60
+    elif [ "$_v" -gt 4400000 ] 2>/dev/null; then
+      _vp=$((100 - 40 * (_v - 4400000) / 100000))
+    fi
+
+    _pct=$((_tp * _sp / 100))
+    _pct=$((_pct * _vp / 100))
+    _desired=$((_base * _pct / 100))
+    [ "$_desired" -lt "$_fl" ] && _desired=$_fl
+    [ "$_desired" -gt "$_base" ] && _desired=$_base
+  fi
+
+  if [ "$(cfg_get tw_enable 0)" = "1" ] && [ "$(cat "$XBT/state/tw_active" 2>/dev/null)" = "1" ]; then
+    _w=$(tw_power_w)
+    _wma=$((_w * 1000000000 / _v))
+    [ "$_wma" -lt "$_desired" ] && _desired=$_wma
+  fi
+
+  [ "$_desired" -lt 1000 ] 2>/dev/null && _desired=1000
+  [ "$_desired" -gt "$_base" ] 2>/dev/null && _desired=$_base
+  echo "$_desired"
+}
+
+direct_tier_is_applied() {  _tier="$1"
   _snap="$XBT/state/direct_applied"
 
   _ma=$(tier_target_ma "$_tier")
@@ -604,7 +779,11 @@ read_voltage_uv() {
 }
 
 target_current_ma() {
-  tier_target_ma "$(power_now)"
+  if policy_on; then
+    policy_target_ma "${1:-}"
+  else
+    tier_target_ma "$(power_now)"
+  fi
 }
 
 quantize_current_ma() {

@@ -7,7 +7,41 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>电池解容工具箱</title>
-<script>(function(){try{var t=localStorage.getItem('bt-theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+<script>(function(){
+  function p(n){return (n<10?'0':'')+n;}
+  function md(d){return p(d.getMonth()+1)+'-'+p(d.getDate());}
+  function full(d){return d.getFullYear()+'-'+md(d);}
+  function match(d,a,b){
+    if(a.length===5){var k=md(d);return a<=b?(k>=a&&k<=b):(k>=a||k<=b);}
+    return full(d)>=a&&full(d)<=b;
+  }
+  function seasonOf(m){return m>=3&&m<=5?'spring':(m>=6&&m<=8?'summer':(m>=9&&m<=11?'autumn':'winter'));}
+  var ranges=[
+    ['newyear','12-31','01-03'],
+    ['spring','2027-02-05','2027-02-13'],
+    ['lantern','2027-02-18','2027-02-20'],
+    ['spring','2028-01-25','2028-01-31'],
+    ['lantern','2028-02-07','2028-02-09'],
+    ['qingming','04-03','04-05'],
+    ['labour','05-01','05-05'],
+    ['dragonboat','2027-06-07','2027-06-11'],
+    ['dragonboat','2028-05-26','2028-05-30'],
+    ['qixi','2027-08-06','2027-08-10'],
+    ['qixi','2028-08-24','2028-08-28'],
+    ['midautumn','2027-09-13','2027-09-17'],
+    ['midautumn','2028-10-01','2028-10-05'],
+    ['national','10-01','10-07'],
+    ['winter','12-21','12-23']
+  ];
+  var names={newyear:'元旦',spring:'春节',lantern:'元宵',qingming:'清明',labour:'劳动节',dragonboat:'端午',qixi:'七夕',midautumn:'中秋',national:'国庆',winter:'冬至'};
+  var now=new Date(),fk='';
+  for(var i=0;i<ranges.length;i++){var r=ranges[i];if(match(now,r[1],r[2])){fk=r[0];break;}}
+  var season=seasonOf(now.getMonth()+1);
+  try{var t=localStorage.getItem('bt-theme');document.documentElement.setAttribute('data-theme',t==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}
+  document.documentElement.setAttribute('data-season',season);
+  if(fk)document.documentElement.setAttribute('data-festival',fk);
+  window.__btTheme={season:season,festival:fk,name:names[fk]||''};
+})();</script>
 <style>
 
 :root{
@@ -106,6 +140,52 @@
   --g3:rgba(150,215,255,.12);
 }
 
+:root[data-season="spring"]{--h:158;--h2:338}
+:root[data-season="summer"]{--h:190;--h2:222}
+:root[data-season="autumn"]{--h:30;--h2:12}
+:root[data-season="winter"]{--h:220;--h2:265}
+
+:root[data-festival="newyear"]{--h:43;--h2:210}
+:root[data-festival="spring"]{--h:4;--h2:42}
+:root[data-festival="lantern"]{--h:346;--h2:38}
+:root[data-festival="qingming"]{--h:146;--h2:175}
+:root[data-festival="labour"]{--h:205;--h2:225}
+:root[data-festival="dragonboat"]{--h:152;--h2:188}
+:root[data-festival="qixi"]{--h:330;--h2:285}
+:root[data-festival="midautumn"]{--h:36;--h2:48}
+:root[data-festival="national"]{--h:4;--h2:43}
+:root[data-festival="winter"]{--h:20;--h2:43}
+
+:root[data-theme="dark"][data-season]{
+  --accent:hsl(var(--h),68%,72%);
+  --accent2:hsl(var(--h),70%,80%);
+  --accent3:hsl(var(--h),72%,89%);
+  --accent-deep:hsl(var(--h),58%,58%);
+  --accent-soft:hsla(var(--h),68%,72%,.14);
+  --accent-line:hsla(var(--h),68%,72%,.28);
+  --energy:hsl(var(--h),60%,75%);
+  --energy-soft:hsla(var(--h),60%,75%,.10);
+  --glow:hsla(var(--h),68%,72%,.18);
+  --g1:hsla(var(--h),62%,62%,.05);
+  --g2:hsla(var(--h2),62%,62%,.035);
+  --g3:hsla(var(--h),70%,55%,.04);
+}
+
+:root[data-theme="light"][data-season]{
+  --accent:hsl(var(--h),38%,32%);
+  --accent2:hsl(var(--h),36%,40%);
+  --accent3:hsl(var(--h),32%,48%);
+  --accent-deep:hsl(var(--h),45%,22%);
+  --accent-soft:hsla(var(--h),40%,32%,.06);
+  --accent-line:hsla(var(--h),40%,32%,.16);
+  --energy:hsl(var(--h),55%,34%);
+  --energy-soft:hsla(var(--h),55%,34%,.12);
+  --glow:hsla(var(--h),40%,32%,.05);
+  --g1:hsla(var(--h),60%,60%,.16);
+  --g2:hsla(var(--h2),60%,60%,.12);
+  --g3:hsla(var(--h),60%,60%,.10);
+}
+
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 html,body{margin:0;padding:0}
@@ -115,20 +195,20 @@ body{
   font-size:14px;line-height:1.5;letter-spacing:0;
   padding:calc(18px + env(safe-area-inset-top)) 14px calc(52px + env(safe-area-inset-bottom));
   min-height:100vh;background:var(--bg);
-  transition:background .45s var(--ease),color .45s var(--ease);
+  transition:color .3s var(--ease);
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
   overflow-x:hidden;
 }
 
-:root[data-theme="dark"] body{text-shadow:0 0 14px rgba(157,123,242,.14),0 1px 1px rgba(0,0,0,.6)}
-:root[data-theme="dark"] .tile .v{text-shadow:0 0 18px rgba(157,123,242,.20),0 1px 1px rgba(0,0,0,.55)}
+:root[data-theme="dark"] body{text-shadow:0 0 14px var(--glow),0 1px 1px rgba(0,0,0,.6)}
+:root[data-theme="dark"] .tile .v{text-shadow:0 0 18px var(--glow),0 1px 1px rgba(0,0,0,.55)}
 
 :root[data-theme="dark"] .glass{
-  box-shadow:var(--shadow),0 0 0 1px rgba(157,123,242,.07),0 0 20px -10px rgba(157,123,242,.18),inset 0 1px 0 var(--hi);
+  box-shadow:var(--shadow),0 0 0 1px var(--accent-line),0 0 20px -10px var(--glow),inset 0 1px 0 var(--hi);
 }
 :root[data-theme="dark"] .tile{border-color:rgba(255,255,255,.075)}
-:root[data-theme="dark"] .glass summary{text-shadow:0 0 12px rgba(157,123,242,.16)}
+:root[data-theme="dark"] .glass summary{text-shadow:0 0 12px var(--glow)}
 
 body::before{
   content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;
@@ -148,7 +228,7 @@ body::before{
   width:36px;height:36px;flex:none;border-radius:var(--r-pill);
   border:1px solid var(--stroke2);
   background:var(--s2);
-  color:var(--fg2);
+  color:var(--accent2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   -webkit-backdrop-filter:blur(var(--blur)) saturate(120%);
   backdrop-filter:blur(var(--blur)) saturate(120%);
@@ -175,7 +255,8 @@ body::before{
 }
 .badge::before{
   content:'';flex:none;width:5px;height:5px;border-radius:50%;
-  background:var(--fg2);
+  background:var(--accent);
+  box-shadow:0 0 5px var(--glow);
   animation:dotPulse 2.6s var(--ease) infinite;
 }
 @keyframes dotPulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
@@ -237,6 +318,20 @@ body::before{
   font-size:10px;font-weight:700;color:var(--muted);
   margin-left:1.5px;letter-spacing:0;
 }
+.tile .v.stale{opacity:.45}
+.live-tag{
+  margin-left:auto;display:inline-flex;align-items:center;gap:5px;
+  font-size:9px;font-weight:700;letter-spacing:.3px;color:var(--muted);
+  text-transform:none;
+}
+.live-tag i{
+  width:5px;height:5px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 6px var(--ok);flex:none;
+}
+.live-tag.pending i{animation:livePulse 1.4s ease-in-out infinite}
+.live-tag.stale{color:var(--bad)}
+.live-tag.stale i{background:var(--bad);box-shadow:0 0 6px var(--bad);animation:none}
+@keyframes livePulse{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
 
 .tile.breath{
   border-color:var(--energy-soft);
@@ -328,6 +423,17 @@ details>summary .ar{
 }
 details[open]>summary .ar{transform:rotate(90deg);color:var(--accent)}
 details.collapsing>summary .ar{transform:rotate(0deg)}
+details>summary .sum-right{display:inline-flex;align-items:center;gap:9px;margin-left:auto}
+.sum-tag{
+  padding:3px 8px;border-radius:var(--r-pill);
+  font-size:var(--t-cap);font-weight:800;letter-spacing:.3px;
+  color:var(--muted);background:var(--s2);border:1px solid var(--stroke2);
+  line-height:1.35;white-space:nowrap;
+  transition:color .22s,border-color .22s,background .22s;
+}
+.sum-tag.ok{color:var(--accent3);border-color:var(--accent-line);background:var(--accent-soft)}
+.sum-tag.wait{color:var(--fg2);border-color:var(--accent-line)}
+.sum-tag.warn{color:#ff9b9b;border-color:rgba(255,120,120,.35);background:rgba(255,80,80,.08)}
 details>.dbody{
   padding:0 16px 16px;
   display:flex;flex-direction:column;gap:11px;
@@ -335,6 +441,26 @@ details>.dbody{
 }
 
 .mini{font-size:var(--t-xs);color:var(--muted);line-height:1.58}
+
+.numgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 4px}
+.numfield{
+  background:var(--s2);border:1px solid var(--stroke);
+  border-radius:var(--r-sm);padding:9px 10px 8px;
+  display:flex;flex-direction:column;gap:1px;min-width:0;
+}
+.numfield b{font-size:var(--t-cap);font-weight:700;letter-spacing:.4px;color:var(--muted);white-space:nowrap}
+.numfield input{
+  width:100%;border:0;background:transparent;color:var(--fg);
+  font-family:inherit;font-size:16px;font-weight:800;line-height:1.2;
+  padding:3px 0 0;outline:none;font-variant-numeric:tabular-nums;
+}
+.numfield small{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0}
+.numfield input:disabled{color:var(--muted)}
+.numfield.off{opacity:.45}
+.panel-off{opacity:.5}
+.policy-mode{margin-top:2px}
+.mode-hint{min-height:2.9em;margin-top:6px}
+
 select{
   width:100%;padding:12px;
   background:var(--s3);color:var(--fg);
@@ -364,6 +490,29 @@ input[type="text"]{font-family:inherit}
   background:var(--accent-soft);
   box-shadow:inset 0 0 0 1px var(--accent-line);
 }
+
+.hz-meta{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:10px 0 0}
+.hz-copy{min-width:0}
+.hz-cap{font-size:var(--t-cap);font-weight:800;letter-spacing:.8px;color:var(--muted)}
+.hz-sub{margin-top:4px;font-size:var(--t-xs);line-height:1.55;color:var(--muted)}
+.hz-sub b{color:var(--fg2);font-weight:800}
+.hz-now{flex:none;padding:6px 10px;border-radius:var(--r-pill);font-size:var(--t-cap);font-weight:800;letter-spacing:.3px;color:var(--muted);background:var(--s2);border:1px solid var(--stroke2);white-space:nowrap}
+.hz-now.warn{color:#ff9b9b;border-color:rgba(255,120,120,.35);background:rgba(255,80,80,.08)}
+.hz-now.busy{color:var(--accent3);border-color:var(--accent-line);background:var(--accent-soft);animation:hzPulse 1.25s ease-in-out infinite}
+@keyframes hzPulse{0%,100%{opacity:1}50%{opacity:.62}}
+.hz-refresh{grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0 4px}
+.hz-refresh.busy{opacity:.58;filter:saturate(.75)}
+.hz-refresh.busy .btn{pointer-events:none}
+.hz-refresh .btn{
+  display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  padding:12px 14px;border-radius:var(--r-md);text-align:left;
+}
+.hz-refresh .btn b{font-size:var(--t-xl);line-height:1;letter-spacing:.2px;font-weight:800;color:var(--fg)}
+.hz-refresh .btn small{font-size:var(--t-cap);font-weight:700;letter-spacing:.4px;color:var(--muted)}
+.hz-refresh .btn.on b{color:var(--accent3)}
+.hz-refresh .btn.on small{color:var(--accent2)}
+.hz-refresh .btn:disabled,.btn.ghost:disabled{opacity:.5;cursor:default}
+.hz-refresh .btn:disabled:active,.btn.ghost:disabled:active{transform:none}
 
 #toast{
   position:fixed;left:50%;bottom:calc(40px + env(safe-area-inset-bottom));
@@ -430,10 +579,12 @@ input[type="text"]{font-family:inherit}
 }
 .glass.anim-in.done{opacity:1;transform:none}
 
-html.theme-tx *{
+html.theme-tx *:not(body){
   transition:background-color .38s var(--ease),color .38s var(--ease),
              border-color .38s var(--ease),box-shadow .38s var(--ease)!important;
 }
+html.theme-tx .qr-item,
+html.theme-tx .qr-item *{transition:none!important}
 
 html.page-hidden .aurora,
 html.page-hidden .aurora b,
@@ -648,6 +799,39 @@ h1{text-wrap:balance}
   text-align:right;line-height:1.4;
 }
 .about-val{color:var(--fg);font-size:var(--t-md);font-weight:700}
+#themeNow{color:var(--accent2)}
+.sponsor .mini{margin:0 0 2px}
+.qr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:11px}
+.qr-item{
+  display:flex;flex-direction:column;align-items:stretch;gap:6px;
+  padding:8px 8px 9px;border:1px solid var(--stroke2);border-radius:var(--r-md);
+  background:var(--s2);text-align:center;
+}
+.qr-item img{
+  display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;
+  border-radius:11px;background:#fff;box-shadow:0 4px 14px -10px rgba(0,0,0,.35);
+}
+.qr-item b{font-size:var(--t-sm);font-weight:800;color:var(--fg);letter-spacing:.3px}
+.qr-item small{font-size:var(--t-cap);font-weight:600;color:var(--muted)}
+@media (max-width:430px){
+  .qr-grid{grid-template-columns:1fr}
+}
+.qr-view{
+  position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(0,0,0,.78);opacity:0;pointer-events:none;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.qr-view.show{opacity:1;pointer-events:auto}
+.qr-view img{
+  width:min(82vw,420px);height:auto;aspect-ratio:1/1;object-fit:contain;
+  background:#fff;border-radius:18px;box-shadow:0 24px 70px -18px #000;
+}
+.qr-view .qr-close{
+  position:absolute;top:max(14px,calc(env(safe-area-inset-top) + 8px));right:16px;
+  width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.22);
+  background:rgba(20,24,32,.74);color:#fff;font:600 22px/1 system-ui,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+}
 </style>
 </head>
 <body>
@@ -679,7 +863,7 @@ h1{text-wrap:balance}
       </div>
     </div>
     <div class="ovw-sec">
-      <div class="ovw-cap">实时数据</div>
+      <div class="ovw-cap">实时数据<span class="live-tag pending" id="liveTag"><i></i><span id="liveTxt">连接中</span></span></div>
       <div class="grid2">
         <div class="tile"><div class="k">电压</div><div class="v" id="cV">--</div></div>
         <div class="tile"><div class="k">电流</div><div class="v" id="cI">--</div></div>
@@ -690,19 +874,24 @@ h1{text-wrap:balance}
   </div>
 
   
-  <details class="glass">
-    <summary>调整刷新率<span class="ar">›</span></summary>
+  <details class="glass" id="hzFold">
+    <summary><span>调整刷新率</span><span class="sum-right"><span class="sum-tag" id="hzTag">—</span><span class="ar">›</span></span></summary>
     <div class="dbody">
-      <div class="mini">当前分区 <b id="slotNow">—</b>（自动检测）· 点击帧率二次确认后现场构建并刷入，自动备份 + SHA 校验</div>
-      <div class="hzgrid" id="hzGrid">
-        <button class="btn" data-hz="120">120Hz</button>
-        <button class="btn" data-hz="132">132Hz</button>
-        <button class="btn" data-hz="144">144Hz</button>
-        <button class="btn" data-hz="156">156Hz</button>
-        <button class="btn" data-hz="165">165Hz</button>
+      <div class="hz-meta">
+        <div class="hz-copy">
+          <div class="hz-cap">刷新率</div>
+          <div class="hz-sub">当前槽 <b id="slotNow">检测中</b> · 现场构建，自动备份 + SHA 校验</div>
+        </div>
+        <span class="hz-now" id="hzNow" aria-live="polite">未记录</span>
       </div>
-      <button class="btn sm ghost" id="btnFlashLocal" style="margin-top:8px;width:100%">重刷上次档位</button>
-      <div class="mini" style="margin-top:6px;line-height:1.6">构建产物即用即删、不占空间；刷入后需重启生效。</div>
+      <div class="hzgrid hz-refresh" id="hzGrid">
+        <button class="btn hz-btn" data-hz="120"><b>120</b><small>标准</small></button>
+        <button class="btn hz-btn" data-hz="132"><b>132</b><small>均衡</small></button>
+        <button class="btn hz-btn" data-hz="144"><b>144</b><small>高刷</small></button>
+        <button class="btn hz-btn" data-hz="165"><b>165</b><small>极速</small></button>
+      </div>
+      <button class="btn sm ghost" id="btnFlashLocal" style="margin-top:8px;width:100%">重刷当前记录档位</button>
+      <div class="mini" style="margin-top:6px;line-height:1.6">165Hz 内含 156Hz 时序，不单独作为档位；构建产物即用即删，刷入后需重启生效。</div>
     </div>
   </details>
 
@@ -720,6 +909,10 @@ h1{text-wrap:balance}
       <div class="ri"><b>公版 PPS</b></div>
       <label class="sw"><input id="freeppsToggle" type="checkbox"><span class="tr"><span class="kn"></span></span></label>
     </div>
+    <div class="row">
+      <div class="ri"><b>触控采样 300Hz</b><span id="touchHint">修改触控配置文件，默认开启，重启生效</span></div>
+      <label class="sw"><input id="touchToggle" type="checkbox"><span class="tr"><span class="kn"></span></span></label>
+    </div>
     <div style="margin-top:4px;border-top:1px solid var(--stroke);padding-top:12px">
       <div class="mini" style="margin-bottom:8px;font-weight:700;color:var(--fg2)">循环次数伪装</div>
       <select id="cycleSel">
@@ -731,6 +924,36 @@ h1{text-wrap:balance}
         <option value="__custom__">自定义…</option>
       </select>
     </div>
+  </div>
+
+  <div class="glass card">
+    <div class="ovw-cap">充电策略</div>
+    <div class="row">
+      <div class="ri"><b>温度墙</b><span>到触发温度后暂停输入，降回恢复温度后恢复；目标功率参与计算与显示</span></div>
+      <label class="sw"><input id="twToggle" type="checkbox"><span class="tr"><span class="kn"></span></span></label>
+    </div>
+    <div id="twPanel">
+      <div class="numgrid">
+        <div class="numfield" id="nfLimit"><b>触发温度</b><input id="twLimit" type="number" inputmode="numeric" min="30" max="55" step="1" value="42"><small>°C</small></div>
+        <div class="numfield" id="nfResume"><b>恢复温度</b><input id="twResume" type="number" inputmode="numeric" min="25" max="54" step="1" value="38"><small>°C</small></div>
+        <div class="numfield" id="nfPower"><b>目标功率</b><input id="twPower" type="number" inputmode="numeric" min="5" max="60" step="1" value="25"><small>W</small></div>
+      </div>
+      <div class="mini">触发后立即暂停输入并锁定，回温后自动恢复；恢复温度必须低于触发温度。</div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="ri"><b>动态充电算法</b><span>按电量、温度、电压与实时功率动态计算目标电流</span></div>
+      <label class="sw"><input id="dynToggle" type="checkbox"><span class="tr"><span class="kn"></span></span></label>
+    </div>
+    <div id="dynPanel">
+      <div class="hzgrid policy-mode" id="dynGrid">
+        <button class="btn" data-mode="gentle">平缓</button>
+        <button class="btn" data-mode="balanced">均衡</button>
+        <button class="btn" data-mode="aggressive">激进</button>
+        <button class="btn" data-mode="berserk">狂暴</button>
+      </div>
+      <div class="mini mode-hint" id="dynHint">均衡：最高约 60W，39°C 起降，45°C 或 92% 触发暂停，适合日常。</div>
+    </div>
+    <div class="mini" id="policyNow" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--stroke)">策略未启用</div>
   </div>
 
   <div class="glass card about">
@@ -753,7 +976,32 @@ h1{text-wrap:balance}
         <span class="about-val">MCheng404</span>
       </span>
     </div>
+    <div class="row">
+      <div class="ri"><b>主题</b><span>按当前季节与节日自动配色</span></div>
+      <span class="about-val" id="themeNow">—</span>
+    </div>
   </div>
+
+  <div class="glass card sponsor">
+    <div class="ovw-cap">赞助支持</div>
+    <div class="mini">如果这个模块帮到你，可以扫码请作者喝杯咖啡；赞助不影响任何功能。点击二维码可放大。</div>
+    <div class="qr-grid">
+      <div class="qr-item">
+        <img src="assets/sponsor-wechat.jpg" width="777" height="777" alt="微信赞赏二维码">
+        <b>微信赞赏</b>
+        <small>扫码支持作者</small>
+      </div>
+      <div class="qr-item">
+        <img src="assets/sponsor-alipay.jpg" width="580" height="580" alt="支付宝赞赏二维码">
+        <b>支付宝赞赏</b>
+        <small>扫码支持作者</small>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="qrView" class="qr-view" aria-hidden="true">
+  <button id="qrClose" class="qr-close" type="button" aria-label="关闭二维码预览">×</button>
+  <img id="qrViewImg" alt="">
 </div>
 <div id="toast"></div>
 
@@ -761,7 +1009,7 @@ h1{text-wrap:balance}
 (function(){
 'use strict';
 var XBT='/data/adb/modules/battery_tune_mc';
-var curSlot='b';   // active dtbo slot (a/b), resolved from ro.boot.slot_suffix at startup
+var curSlot='';   // active dtbo slot (a/b), resolved from ro.boot.slot_suffix at startup
 var $=function(id){return document.getElementById(id);};
 function toast(m,ms){var t=$('toast');if(!t)return;t.textContent=(m===undefined||m===null)?'':m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(function(){t.classList.remove('show');},ms||1800);}
 
@@ -770,18 +1018,19 @@ function showOut(text){
   toast(s?(''+s):'(无输出)',6000);
 }
 
-var cbSeq=0,refreshing=false;
+var cbSeq=0;
 function execCmd(cmd,options){
   options=options||{};
   return new Promise(function(resolve){
     var k=(typeof window.ksu!=='undefined')?window.ksu:null;
     if(!k||typeof k.exec!=='function'){resolve({errno:-1,stdout:'',stderr:'KSU 桥接不可用：请在 KernelSU 管理器 WebUI 中打开'});return;}
     var cb='bt_cb_'+Date.now()+'_'+(cbSeq++),done=false;
+    var timeout=(options&&Number(options.timeout))||30000;
     function clean(){try{delete window[cb];}catch(e){}}
     window[cb]=function(errno,stdout,stderr){if(done)return;done=true;clean();
       resolve({errno:(typeof errno==='number')?errno:0,stdout:(stdout==null)?'':String(stdout),stderr:(stderr==null)?'':String(stderr)});};
     try{k.exec(cmd,JSON.stringify(options),cb);}catch(e){if(!done){done=true;clean();resolve({errno:-2,stdout:'',stderr:'exec 失败: '+e});}return;}
-    setTimeout(function(){if(!done){done=true;clean();resolve({errno:-3,stdout:'',stderr:'执行超时'});}},30000);
+    setTimeout(function(){if(!done){done=true;clean();resolve({errno:-3,stdout:'',stderr:'执行超时'});}},timeout);
   });
 }
 function sh(cmd){return execCmd(cmd).then(function(r){var o=r.stdout||'';if(r.stderr)o+=(o?'\n':'')+'[stderr] '+r.stderr;return o;});}
@@ -796,9 +1045,22 @@ function applyTheme(t,animate){
   if(animate){clearTimeout(_txTimer);_txTimer=setTimeout(function(){root.classList.remove('theme-tx');},380);}
 }
 
-function stText(s){var m={Charging:'充电中',Discharging:'放电中',Full:'已充满','Not charging':'未充电'};return m[s]||s||'未知';}
+function batState(s){
+  var t=String(s||'').trim().toLowerCase();
+  if(t==='charging')return 'charging';
+  if(t==='discharging')return 'discharging';
+  if(t==='full')return 'full';
+  if(t==='not charging')return 'notcharging';
+  return 'unknown';
+}
+function stText(s){
+  var m={charging:'充电中',discharging:'放电中',full:'已充满',notcharging:'未充电'};
+  return m[batState(s)]||'未知';
+}
 // num(): empty string from backend means "missing" -> null; callers render '--' instead of a fake 0.
 function num(v){if(v===null||v===undefined)return null;var s=String(v).trim();if(s==='')return null;var n=Number(s);return isFinite(n)?n:null;}
+// Plausibility gate: reject a single broken sample instead of drawing it.
+function inRange(v,lo,hi){var n=num(v);return (n===null||n<lo||n>hi)?null:n;}
 
 function fmtNum(v,div,dp,unit){var n=num(v);if(n===null)return '--';return (n/div).toFixed(dp)+'<small>'+unit+'</small>';}
 
@@ -829,6 +1091,48 @@ function setVal(id,html){
   if(_reduceMotion||Date.now()<_busyUntil)return;
   
 }
+var _miss={};
+// Numeric easing between samples so a 3s cadence reads as continuous data
+// instead of a jump every poll.
+function animNum(id,value,unit,dp){
+  var el=$(id);if(!el)return;
+  if(value===null||value===undefined||!isFinite(value)){el._v=null;setVal(id,'--');return;}
+  var prev=(typeof el._v==='number')?el._v:value;
+  el._v=value;
+  if(_reduceMotion||Math.abs(value-prev)<Math.pow(10,-dp)/2){
+    el.innerHTML=value.toFixed(dp)+'<small>'+unit+'</small>';return;
+  }
+  if(el._raf)cancelAnimationFrame(el._raf);
+  var t0=performance.now();
+  function frame(now){
+    var k=Math.min(1,(now-t0)/380),e=1-Math.pow(1-k,3);
+    el.innerHTML=(prev+(value-prev)*e).toFixed(dp)+'<small>'+unit+'</small>';
+    if(k<1)el._raf=requestAnimationFrame(frame);else el._raf=0;
+  }
+  el._raf=requestAnimationFrame(frame);
+}
+// A transient empty read keeps the last good number for up to two cycles
+// (dimmed) instead of flashing '--'; only a sustained loss clears the field.
+function liveNum(id,value,unit,dp){
+  if(value===null||value===undefined){
+    _miss[id]=(_miss[id]||0)+1;
+    var el=$(id);
+    if(el&&_miss[id]<=2){el.classList.add('stale');return;}
+    animNum(id,null,unit,dp);return;
+  }
+  _miss[id]=0;
+  var el=$(id);if(el)el.classList.remove('stale');
+  animNum(id,value,unit,dp);
+}
+function setLive(ok,txt){
+  var tag=$('liveTag'),t=$('liveTxt');
+  if(tag){tag.classList.remove('pending','stale');if(!ok)tag.classList.add('stale');}
+  if(t)t.textContent=txt;
+}
+function clockText(){
+  var d=new Date(),p=function(n){return (n<10?'0':'')+n;};
+  return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
 function ripple(e){
   var t=e.target;var b=t&&t.closest?t.closest('.btn'):null;if(!b)return;
   var r=document.createElement('span');r.className='rip';
@@ -844,50 +1148,117 @@ function playEntrance(){
   for(var i=0;i<els.length;i++)(function(el,k){el.classList.add('anim-in');setTimeout(function(){el.classList.add('done');},40+k*55);})(els[i],i);
 }
 
-function shR(cmd){return execCmd(cmd).then(function(r){var o=r.stdout||'';if(r.stderr)o+=(o?'\n':'')+'[stderr] '+r.stderr;return {errno:r.errno,out:o};});}
+function shR(cmd,options){return execCmd(cmd,options).then(function(r){var o=r.stdout||'';if(r.stderr)o+=(o?'\n':'')+'[stderr] '+r.stderr;return {errno:r.errno,out:o};});}
 function errText(e){return e===-1?'KSU桥接不可用：请从 KernelSU管理器进入':(e===-3?'执行超时，请重试':(e===-2?'执行异常':'执行失败（见下方输出）'));}
 
-var _refreshAgain=false;
-var _lastKv={};
-function refresh(){
-  if(refreshing){_refreshAgain=true;return Promise.resolve();}
-  refreshing=true;_refreshAgain=false;
-  return sh('sh '+XBT+'/scripts/status_kv.sh').then(function(o){
-    var kv=parseKV(o);
-    _lastKv=kv;
-    var full=Number(kv.charge_full_mah)||0,des=Number(kv.charge_design_mah)||0;
-    var vV=num(kv.voltage_uv),vI=num(kv.battery_current_abs_ma),vP=num(kv.battery_power_w),vT=num(kv.temp_c),vSoc=num(kv.soc);
-    setVal('cSoc',vSoc===null?'--':vSoc+'<small>%</small>');
-    setVal('cSt',stText(kv.status));
-    setVal('cDes',des>0?(des+'<small>mAh</small>'):'--');
-    setVal('cCap',full>0?(full+'<small>mAh</small>'):'--');
-    setVal('cV',vV===null||vV<=0?'--':(vV/1000000).toFixed(3)+'<small>V</small>');
-    setVal('cI',vI===null||vI===0?'--':(Math.abs(vI)/1000).toFixed(2)+'<small>A</small>');
-    var vPout=(vP===null)?null:(kv.status==='Discharging'?-1:1)*Math.abs(vP);
-    setVal('cP',(vPout===null||vPout===0)?'--':vPout.toFixed(1)+'<small>W</small>');
-    setVal('cT',vT===null?'--':(vT/10).toFixed(1)+'<small>°C</small>');
-    setVal('cH',(full>0&&des>0)?(Math.round(full/des*100)+'<small>%</small>'):(kv.health||'--'));
-    var charging=(kv.status==='Charging');
-    var _ti=$('cI')&&$('cI').parentElement,_tp=$('cP')&&$('cP').parentElement;
-    if(_ti)_ti.classList.toggle('breath',charging);
-    if(_tp)_tp.classList.toggle('breath',charging);
-    // Device badge: prefer backend dev_name/dev_code; keep it in the same refresh cycle.
+function setHzBusy(on,hz){
+  _hzBusy=!!on;
+  var grid=$('hzGrid'),flash=$('btnFlashLocal'),now=$('hzNow'),tag=$('hzTag');
+  if(grid){
+    grid.classList.toggle('busy',_hzBusy);
+    grid.setAttribute('aria-busy',_hzBusy?'true':'false');
+    var bs=grid.querySelectorAll('button[data-hz]');
+    for(var i=0;i<bs.length;i++)bs[i].disabled=_hzBusy;
+  }
+  if(flash&&_hzBusy)flash.disabled=true;
+  if(now){
+    now.classList.toggle('busy',_hzBusy);
+    if(_hzBusy)now.textContent='处理中'+(hz?' '+hz+'Hz':'…');
+  }
+  if(tag&&_hzBusy){tag.textContent='处理中';tag.className='sum-tag wait';}
+}
+
+var _refreshFailed=false,_lastOk=0;
+var _lastKv={},_liveBusy=false,_fullBusy=false,_fullQueued=false,_fullTimer=0,_liveFail=0,_policyState='';
+var _hzBusy=false;
+
+function mergeKv(kv){
+  for(var k in kv){
+    if(Object.prototype.hasOwnProperty.call(kv,k))_lastKv[k]=kv[k];
+  }
+}
+
+function applyLive(kv){
+  mergeKv(kv);
+  _lastOk=Date.now();_refreshFailed=false;_liveFail=0;
+  var full=Number(kv.charge_full_mah)||0,des=Number(kv.charge_design_mah)||0;
+  var st=batState(kv.status);
+  var vSoc=inRange(kv.soc,0,100);
+  var vV=inRange(kv.voltage_uv,2000000,6000000);
+  var vI=inRange(kv.battery_current_abs_ma,0,30000);
+  var vP=inRange(kv.battery_power_w,0,400);
+  var vT=inRange(kv.temp_c,-200,1500);
+  liveNum('cSoc',vSoc,'%',0);
+  setVal('cSt',stText(kv.status));
+  setVal('cDes',des>0?(des+'<small>mAh</small>'):'--');
+  setVal('cCap',full>0?(full+'<small>mAh</small>'):'--');
+  liveNum('cV',vV===null?null:vV/1000000,'V',3);
+  liveNum('cI',vI===null?null:vI/1000,'A',2);
+  liveNum('cP',vP===null?null:(st==='discharging'?-vP:vP),'W',1);
+  liveNum('cT',vT===null?null:vT/10,'°C',1);
+  setVal('cH',(full>0&&des>0)?(Math.round(full/des*100)+'<small>%</small>'):(kv.health||'--'));
+  var charging=(st==='charging');
+  var _ti=$('cI')&&$('cI').parentElement,_tp=$('cP')&&$('cP').parentElement;
+  if(_ti)_ti.classList.toggle('breath',charging);
+  if(_tp)_tp.classList.toggle('breath',charging);
+  setLive(true,'实时 '+clockText());
+  var _ps=String(kv.tw_active||'')+'|'+String(kv.policy_suspended||'')+'|'+String(kv.dyn_cut||'');
+  if(_ps!==_policyState){
+    _policyState=_ps;
+    if(_lastKv.tw_enable!==undefined){try{syncPolicy();}catch(e){}}
+  }
+}
+
+function applyFullStatic(kv){
+  var run=function(){
     if(kv.dev_code){
       var _NM={xuanyuan:'小米15 Ultra',dada:'小米15',haotian:'小米15 Pro',nezha:'小米17 Ultra',myron:'Redmi K90 Pro Max',annibale:'Redmi K90',bixi:'小米 MIX Flip2',onyx:'Redmi Turbo 4 Pro',popsicle:'小米17 Pro Max',miro:'Redmi K80 Pro',songyuan:'Redmi K100 Pro Max',warsaw:'Redmi K90 Ultra',pudding:'小米17',byron:'小米17 Max'};
       var _nm=kv.dev_name||_NM[kv.dev_code]||kv.dev_code;
       var _db=$('devBadge');if(_db)_db.textContent=_nm+' ('+kv.dev_code+')';
     }
-    // Sync all toggles; missing keys leave current state untouched (no gray-out).
     try{syncAllToggles();}catch(e){}
+    try{syncPolicy();}catch(e){}
+  };
+  setTimeout(run,90);
+}
+
+function refreshLive(){
+  if(_liveBusy)return Promise.resolve();
+  _liveBusy=true;
+  return sh('sh '+XBT+'/scripts/status_live.sh').then(function(o){
+    var kv=parseKV(o);
+    if(!kv.status&&!kv.soc&&!kv.voltage_uv)throw new Error('empty live');
+    applyLive(kv);
   }).catch(function(e){
+    _liveFail++;
+    if(_liveFail===1){try{toast('实时数据读取失败，正在重试…');}catch(_){}}
+    setLive(false,'重连中');
+    if(_liveFail>=3)_refreshFailed=true;
+  }).finally(function(){_liveBusy=false;});
+}
 
-    try{toast('状态读取失败：'+(e&&e.message?e.message:e));}catch(_){}
+function refreshFull(){
+  if(_fullBusy){_fullQueued=true;return Promise.resolve();}
+  if(_liveBusy){queueFull(280);return Promise.resolve();}
+  _fullBusy=true;
+  return sh('sh '+XBT+'/scripts/status_kv.sh').then(function(o){
+    var kv=parseKV(o);
+    if(!kv.status&&!kv.soc&&!kv.voltage_uv)throw new Error('empty full');
+    if(kv.status!==undefined||kv.soc!==undefined)applyLive(kv);
+    applyFullStatic(kv);
+  }).catch(function(e){
+    if(!_lastOk)setLive(false,'离线');
   }).finally(function(){
-    refreshing=false;
-
-    if(_refreshAgain){_refreshAgain=false;try{refresh();}catch(e){}}
+    _fullBusy=false;
+    if(_fullQueued){_fullQueued=false;queueFull(220);}
   });
 }
+
+function queueFull(ms){
+  if(_fullTimer)clearTimeout(_fullTimer);
+  _fullTimer=setTimeout(function(){_fullTimer=0;refreshFull();},ms===undefined?260:ms);
+}
+
 
 function execToggle(cmd,el,okMsg,prevArg){
   toast('执行中…');
@@ -904,7 +1275,7 @@ function execToggle(cmd,el,okMsg,prevArg){
     else{toast('执行失败（见下方输出）');}
     if(r.errno!==0&&el&&prev!==null){el.checked=prev;}
 
-    refresh();
+    queueFull(260);
     return;
   }).catch(function(e){
     if(el&&prev!==null)el.checked=prev;
@@ -916,7 +1287,7 @@ function execToggle(cmd,el,okMsg,prevArg){
 }
 
 function syncAllToggles(){
-  var t=[['unlockToggle','unlock'],['cloudToggle','cloud_guard'],['freeppsToggle','freepps']];
+  var t=[['unlockToggle','unlock'],['cloudToggle','cloud_guard'],['freeppsToggle','freepps'],['touchToggle','touch_sample']];
   for(var i=0;i<t.length;i++){
     var el=$(t[i][0]),k=t[i][1];
     if(!el||el._busy)continue;
@@ -932,8 +1303,89 @@ function setCloud(on){
   execToggle('sh '+XBT+'/scripts/cloud_guard.sh '+(on?'on':'off'),$('cloudToggle'),null,!on);
 }
 function setFreepps(on){
-  toast(on?'已开启公版 PPS，拔插一次充电器生效':'已关闭公版 PPS，拔插一次充电器生效');
-  execToggle('sh '+XBT+'/scripts/freepps.sh '+(on?'on':'off'),$('freeppsToggle'),null,!on);
+  var cmd='sh '+XBT+'/scripts/freepps.sh '+(on?'on':'off');
+  execToggle(cmd,$('freeppsToggle'),on?'公版 PPS 已开启，拔插充电器生效':'公版 PPS 已关闭',!on);
+}
+function setTouch(on){
+  var cmd='sh '+XBT+'/scripts/touch.sh '+(on?'on':'off');
+  execToggle(cmd,$('touchToggle'),on?'触控采样 300Hz 已开启，重启生效':'触控采样已关闭，重启恢复原厂',!on);
+}
+
+var MODE_INFO={
+  gentle:{name:'平缓',max:45,hint:'平缓：最高约 45W，36°C 起降，42°C 或 90% 触发暂停，适合无散热器或边玩边充。'},
+  balanced:{name:'均衡',max:60,hint:'均衡：最高约 60W，39°C 起降，45°C 或 92% 触发暂停，适合日常。'},
+  aggressive:{name:'激进',max:75,hint:'激进：最高约 75W，42°C 起降，48°C 或 95% 触发暂停，适合低温环境。'},
+  berserk:{name:'狂暴',max:90,hint:'狂暴：最高约 90W，45°C 起降，52°C 或 98% 触发暂停，仅短时使用。'}
+};
+function setTw(on){
+  execToggle('sh '+XBT+'/scripts/charge_policy.sh tw '+(on?'on':'off'),$('twToggle'),on?'温度墙已开启':'温度墙已关闭',!on);
+}
+function setDyn(on){
+  execToggle('sh '+XBT+'/scripts/charge_policy.sh dyn '+(on?'on':'off'),$('dynToggle'),on?'动态充电已开启':'动态充电已关闭',!on);
+}
+function setTwVal(key,id,lo,hi){
+  var el=$(id);if(!el||el._busy)return;
+  var n=Number(el.value),v=Math.round(n);
+  if(!isFinite(n)||v<lo||v>hi){toast('范围 '+lo+'-'+hi);queueFull(260);return;}
+  el._busy=true;
+  shR('sh '+XBT+'/scripts/charge_policy.sh tw '+key+' '+v).then(function(r){
+    showOut(r.out);
+    if(r.errno===0)toast(String(r.out||'').trim()||'已保存');
+    else toast(errText(r.errno));
+  }).catch(function(e){toast('执行异常: '+e);}).finally(function(){el._busy=false;queueFull(260);});
+}
+function setDynMode(m){
+  if(!MODE_INFO[m])return;
+  var g=$('dynGrid');if(g&&g._busy)return;
+  if(g)g._busy=true;
+  shR('sh '+XBT+'/scripts/charge_policy.sh dyn mode '+m).then(function(r){
+    showOut(r.out);
+    if(r.errno===0)toast(MODE_INFO[m].name+'算法已启用');
+    else toast(errText(r.errno));
+  }).catch(function(e){toast('执行异常: '+e);}).finally(function(){if(g)g._busy=false;queueFull(260);});
+}
+function syncPolicy(){
+  var tw=String(_lastKv.tw_enable||'0')==='1';
+  var dyn=String(_lastKv.dyn_enable||'0')==='1';
+  var twEl=$('twToggle'),dynEl=$('dynToggle');
+  if(twEl&&!twEl._busy)twEl.checked=tw;
+  if(dynEl&&!dynEl._busy)dynEl.checked=dyn;
+  var tp=$('twPanel'),dp=$('dynPanel');
+  if(tp)tp.classList.toggle('panel-off',!tw);
+  if(dp)dp.classList.toggle('panel-off',!dyn);
+  var fields=[['twLimit','tw_limit'],['twResume','tw_resume'],['twPower','tw_power_w']];
+  for(var i=0;i<fields.length;i++){
+    var el=$(fields[i][0]);if(!el)continue;
+    el.disabled=!tw;
+    var nf=el.parentElement;if(nf)nf.classList.toggle('off',!tw);
+    var v=_lastKv[fields[i][1]];
+    if(v!==undefined&&v!==null&&v!==''&&document.activeElement!==el)el.value=v;
+  }
+  var mode=_lastKv.dyn_mode||'balanced';
+  var info=MODE_INFO[mode]||MODE_INFO.balanced;
+  var btns=$('dynGrid')?$('dynGrid').querySelectorAll('button[data-mode]'):[];
+  for(var j=0;j<btns.length;j++)btns[j].classList.toggle('on',btns[j].getAttribute('data-mode')===mode);
+  var hint=$('dynHint');if(hint)hint.textContent=info.hint;
+  var pn=$('policyNow');
+  if(pn){
+    if(!tw&&!dyn){pn.textContent='策略未启用，保持原有充电逻辑';}
+    else{
+      var parts=[];
+      var susp=String(_lastKv.policy_suspended||'0')==='1';
+      if(tw)parts.push(String(_lastKv.tw_active)==='1'?'温度墙触发':'温度墙待命');
+      if(dyn)parts.push(info.name);
+      var s=parts.join(' · ');
+      if(susp)s+=' · 已暂停充电';
+      else if(dyn&&String(_lastKv.dyn_cut)==='1')s+=' · 动态阈值触发';
+      var target=Number(_lastKv.policy_target_ma)||0;
+      var volt=Number(_lastKv.voltage_uv)||0;
+      var watt=(target>0&&volt>0)?(target/1000*volt/1000000):0;
+      if(watt>0)s+=' · 目标 '+watt.toFixed(1)+'W';
+      var temp=Number(_lastKv.temp_c);
+      if(isFinite(temp)&&temp>-100)s+=' · '+ (temp/10).toFixed(1)+'°C';
+      pn.textContent=s;
+    }
+  }
 }
 function syncCycle(){
 
@@ -994,25 +1446,36 @@ $('themeBtn').onclick=function(){var cur=document.documentElement.getAttribute('
 $('unlockToggle').onchange=function(){setUnlock(this.checked);};
 $('cloudToggle').onchange=function(){setCloud(this.checked);};
 $('freeppsToggle').onchange=function(){setFreepps(this.checked);};
+$('touchToggle').onchange=function(){setTouch(this.checked);};
+$('twToggle').onchange=function(){setTw(this.checked);};
+$('dynToggle').onchange=function(){setDyn(this.checked);};
+$('twLimit').onchange=function(){setTwVal('limit','twLimit',30,55);};
+$('twResume').onchange=function(){setTwVal('resume','twResume',25,Number($('twLimit').value)-1);};
+$('twPower').onchange=function(){setTwVal('power','twPower',5,60);};
+$('dynGrid').addEventListener('click',function(e){
+  var b=e.target.closest?e.target.closest('button[data-mode]'):null;
+  if(!b)return;
+  setDynMode(b.getAttribute('data-mode'));
+});
 $('cycleSel').onchange=setCycle;
 $('btnFlashLocal').onclick=function(){
-  var _btn=this;
-  if(_btn._busy)return;
-  _btn._busy=true;_btn.disabled=true;
-  var _done=function(){_btn._busy=false;_btn.disabled=false;};
+  if(_hzBusy)return;
+  setHzBusy(true,'');
+  var _fin=function(){setHzBusy(false);syncHz();};
+  if(!curSlot){toast('正在检测当前槽，请稍候');syncDev();_fin();return;}
   shR('sh '+XBT+'/scripts/dtbo.sh haslocal').then(function(rr){
-    if(rr.errno!==0){toast('无法确认内置镜像：'+errText(rr.errno));_done();return;}
-    if(String(rr.out||'').trim()!=='yes'){toast('安装包未内置本机 DTBO，请用下方扫描刷入');_done();return;}
+    if(rr.errno!==0){toast('无法确认内置镜像：'+errText(rr.errno));_fin();return;}
+    if(String(rr.out||'').trim()!=='yes'){toast('没有可重刷的档位记录，请先选择刷新率');_fin();return;}
     var s=curSlot;
-    if(!confirm('刷入解容 DTBO（二次确认）\n\n目标槽: dtbo_'+s+'\n来源: 安装包内置镜像\n\n流程: 自动备份当前 DTBO → 写入 → SHA 校验\n刷入后需重启生效\n\n确认继续？')){_done();return;}
+    if(!confirm('重刷当前记录档位（二次确认）\n\n目标槽: dtbo_'+s+'\n来源: 安装包内置 dtb 载荷\n\n流程: 自动备份当前 DTBO → 构建 → 写入 → SHA 校验\n刷入后需重启生效\n\n确认继续？')){_fin();return;}
     toast('刷入中，请勿操作',6000);showOut('刷入中…');
-    shR('sh '+XBT+'/scripts/dtbo.sh flashlocal '+s).then(function(r){
+    shR('sh '+XBT+'/scripts/dtbo.sh flashlocal '+s,{timeout:60000}).then(function(r){
       showOut(r.out);
       if(r.errno!==0){toast(errText(r.errno));return;}
       if(/失败|中止|不一致|错误/.test(String(r.out||''))){toast('刷入失败：详见下方输出');}
       else{toast('刷写结束，重启后生效');}
-    }).catch(function(e){toast('执行异常: '+e);}).finally(_done);
-  }).catch(function(e){toast('执行异常: '+e);_done();});
+    }).catch(function(e){toast('执行异常: '+e);}).finally(_fin);
+  }).catch(function(e){toast('执行异常: '+e);_fin();});
 };
 
 (function(){
@@ -1020,29 +1483,67 @@ $('btnFlashLocal').onclick=function(){
   if(!grid)return;
   grid.addEventListener('click',function(e){
     var b=e.target.closest?e.target.closest('button[data-hz]'):null;
-    if(!b||b._busy)return;
+    if(!b||_hzBusy)return;
+    if(!curSlot){toast('正在检测当前槽，请稍候');syncDev();return;}
     var hz=b.getAttribute('data-hz');
     var s=curSlot;
     if(!confirm('构建并刷入 '+hz+'Hz 解容 DTBO（二次确认）\n\n目标槽: dtbo_'+s+'\n来源: 内置 dtb 载荷，现场构建镜像\n\n流程: 自动备份 → 构建 → 写入 → SHA 校验\n刷入后需重启生效\n\n确认继续？'))return;
-    b._busy=true;b.disabled=true;
+    setHzBusy(true,hz);
     toast('构建并刷入 '+hz+'Hz，请勿操作',6000);showOut('构建 '+hz+'Hz 镜像并刷入…');
-    shR('sh '+XBT+'/scripts/dtbo.sh build '+hz+' '+s).then(function(r){
+    shR('sh '+XBT+'/scripts/dtbo.sh build '+hz+' '+s,{timeout:60000}).then(function(r){
       showOut(r.out);
       if(r.errno!==0){toast(errText(r.errno));return;}
       if(/失败|中止|不一致|错误/.test(String(r.out||''))){toast('刷入失败：详见下方输出');}
-      else{toast('刷写结束，重启后生效');refresh();}
-    }).catch(function(e){toast('执行异常: '+e);}).finally(function(){b._busy=false;b.disabled=false;});
+      else{toast('刷写结束，重启后生效');queueFull(300);}
+    }).catch(function(e){toast('执行异常: '+e);}).finally(function(){setHzBusy(false);syncHz();});
   });
 })();
 
-function syncDev(){
+function syncHz(){
+  var grid=$('hzGrid'), now=$('hzNow'), tag=$('hzTag'), flash=$('btnFlashLocal');
+  if(!grid||!now||_hzBusy)return;
+  var bs=grid.querySelectorAll('button[data-hz]');
+  var reset=function(){
+    now.textContent='未记录';now.classList.remove('warn');
+    for(var i=0;i<bs.length;i++)bs[i].classList.remove('on');
+    if(tag){tag.textContent='—';tag.className='sum-tag';}
+    if(flash)flash.disabled=true;
+  };
+  shR('cat '+XBT+'/state/dtbo_choice').then(function(r){
+    if(r.errno!==0){reset();return;}
+    var s=String(r.out||'').trim();
+    var m=/^(flashed|already|later|failed|build-failed)-(\d+)$/.exec(s);
+    var hz=m?m[2]:'';
+    for(var i=0;i<bs.length;i++) bs[i].classList.toggle('on',!!hz&&bs[i].getAttribute('data-hz')===hz);
+    now.classList.remove('warn');
+    if(flash)flash.disabled=!m;
+    if(tag)tag.className='sum-tag';
+    if(!m){now.textContent='未记录';if(tag)tag.textContent='—';}
+    else if(m[1]==='later'){now.textContent='待刷 '+hz+'Hz';if(tag){tag.textContent='待刷';tag.className='sum-tag wait';}}
+    else if(m[1]==='failed'||m[1]==='build-failed'){now.textContent='失败 '+hz+'Hz';now.classList.add('warn');if(tag){tag.textContent='失败';tag.className='sum-tag warn';}}
+    else if(m[1]==='already'){now.textContent='已是 '+hz+'Hz';if(tag){tag.textContent=hz+'Hz';tag.className='sum-tag ok';}}
+    else{now.textContent='已刷 '+hz+'Hz';if(tag){tag.textContent=hz+'Hz';tag.className='sum-tag ok';}}
+  },reset);
+}
 
-  sh('getprop ro.boot.slot_suffix').then(function(o){var s=String(o||'').trim();if(s==='_a'||s==='_b'){curSlot=s.slice(1);var sn=$('slotNow');if(sn)sn.textContent=s;}});
+function syncDev(){
+  sh('getprop ro.boot.slot_suffix').then(function(o){
+    var s=String(o||'').trim(),sn=$('slotNow');
+    if(s==='_a'||s==='_b'){curSlot=s.slice(1);if(sn)sn.textContent=s;}
+    else if(sn){sn.textContent='未知';}
+    syncHz();
+  },function(){var sn=$('slotNow');if(sn)sn.textContent='未知';syncHz();});
 }
 
 applyTheme(document.documentElement.getAttribute('data-theme')||'dark',false);
+(function(){
+  var t=window.__btTheme||{},el=$('themeNow');
+  var sn={spring:'春季',summer:'夏季',autumn:'秋季',winter:'冬季'};
+  if(el)el.textContent=t.name?('节日 · '+t.name):((sn[t.season]||'自动')+'主题');
+})();
 
-syncDev();syncCycle();refresh();
+syncDev();
+setTimeout(function(){syncCycle();},600);
 document.addEventListener('pointerdown',ripple);
 function bindFolds(){
   var list=document.querySelectorAll('details');
@@ -1085,28 +1586,47 @@ function bindFolds(){
   })(list[i]);
 };
 bindFolds();playEntrance();
+(function(){
+  var d=$('hzFold');
+  if(!d)return;
+  try{if(localStorage.getItem('bt-hz-open')==='1')d.open=true;}catch(e){}
+  d.addEventListener('toggle',function(){
+    try{localStorage.setItem('bt-hz-open',d.open?'1':'0');}catch(e){}
+  });
+})();
 
-var _pollTimer=0,_pollMs=8000,_pollErr=0,_pageVisible=true;
+var _pollTimer=0,_pollMs=6000,_pollErr=0,_pageVisible=true,_pollTickNo=0;
 function pollDelay(){
-  var st=String((_lastKv&&_lastKv.status)||'');
-  if(st.indexOf('Charging')>=0)return 5000;
-  if(st.indexOf('Discharging')>=0)return 15000;
-  return 20000;
+  var st=batState(_lastKv&&_lastKv.status);
+  if(st==='charging')return 3000;
+  if(st==='discharging')return 6000;
+  return 12000;
 }
 function pollStop(){ if(_pollTimer){clearTimeout(_pollTimer);_pollTimer=0;} }
 function pollStart(){ if(_pollTimer||!_pageVisible)return; _pollTimer=setTimeout(pollTick,_pollMs); }
 function pollTick(){
   _pollTimer=0;
   if(!_pageVisible)return;
+  if(_lastOk&&Date.now()-_lastOk>_pollMs*2+6000)setLive(false,'重连中');
+  _pollTickNo++;
+  var _needFull=(_pollTickNo%10===0);
   try{
-    Promise.resolve().then(function(){return refresh();}).then(function(){
-      _pollErr=0;_pollMs=pollDelay();pollStart();
+    Promise.resolve().then(function(){return refreshLive();}).then(function(){
+      if(_needFull)return refreshFull();
+    }).then(function(){
+      if(_refreshFailed){
+        _pollErr=Math.min(_pollErr+1,4);
+        _pollMs=Math.min(3000*Math.pow(2,_pollErr),30000);
+      }else{
+        _pollErr=0;_pollMs=pollDelay();
+      }
+      pollStart();
     },function(){
       _pollErr=Math.min(_pollErr+1,4);
-      _pollMs=Math.min(5000*Math.pow(2,_pollErr),60000);   // 5s→10s→20s→40s→60s
+      _pollMs=Math.min(3000*Math.pow(2,_pollErr),30000);
       pollStart();
     });
-  }catch(e){ _pollMs=Math.min(_pollMs*2,60000); pollStart(); }
+  }catch(e){ _pollMs=Math.min(_pollMs*2,30000); pollStart(); }
 }
 
 // ---- visibility: hidden -> stop polling; visible -> refresh now ----
@@ -1118,7 +1638,7 @@ function applyVis(){
     root.classList.add('page-hidden');
   }else{
     root.classList.remove('page-hidden');
-    refresh();pollStart();
+    refreshLive();queueFull(280);pollStart();
   }
 }
 document.addEventListener('visibilitychange',applyVis);
@@ -1129,14 +1649,16 @@ window.addEventListener('pageshow',applyVis);
 _pollMs=3000;
 (function bootRefresh(){
   try{
-    Promise.resolve().then(function(){return refresh();}).then(function(){
-      _pollErr=0;_pollMs=pollDelay();pollStart();
+    Promise.resolve().then(function(){return refreshLive();}).then(function(){
+      queueFull(1200);
+      if(_refreshFailed){_pollErr=1;_pollMs=6000;}else{_pollErr=0;_pollMs=pollDelay();}
+      pollStart();
     },function(){
       _pollErr=Math.min(_pollErr+1,4);
-      _pollMs=Math.min(5000*Math.pow(2,_pollErr),60000);
+      _pollMs=Math.min(6000*Math.pow(2,_pollErr),30000);
       pollStart();
     });
-  }catch(e){ _pollMs=5000; pollStart(); }
+  }catch(e){ _pollMs=6000; pollStart(); }
 })();
 
 setTimeout(function(){try{execCmd('echo warmup').then(function(){});}catch(e){}},1500);
@@ -1232,6 +1754,37 @@ setTimeout(function(){try{execCmd('echo warmup').then(function(){});}catch(e){}}
     }catch(e){}
 
   }catch(e){  }
+})();
+</script>
+<script>
+(function(){
+  var view=document.getElementById('qrView');
+  var viewImg=document.getElementById('qrViewImg');
+  var close=document.getElementById('qrClose');
+  if(!view||!viewImg||!close)return;
+  function hide(){
+    view.classList.remove('show');
+    view.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  function show(src,alt){
+    viewImg.src=src;
+    viewImg.alt=alt||'赞赏二维码';
+    view.classList.add('show');
+    view.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+  }
+  var imgs=document.querySelectorAll('.qr-item img');
+  for(var i=0;i<imgs.length;i++){
+    imgs[i].style.cursor='zoom-in';
+    imgs[i].addEventListener('click',function(){
+      if(this.complete&&this.naturalWidth)show(this.currentSrc||this.src,this.alt);
+    });
+  }
+  close.addEventListener('click',hide);
+  view.addEventListener('click',function(e){if(e.target===view)hide();});
+  viewImg.addEventListener('click',function(e){e.stopPropagation();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')hide();});
 })();
 </script>
 </body>

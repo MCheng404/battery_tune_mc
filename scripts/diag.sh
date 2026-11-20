@@ -83,9 +83,9 @@ else
   echo "分区设备   : $_ddev <不存在>"
 fi
 _dchoice=$(cat "$XBT/state/dtbo_choice" 2>/dev/null)
-_dhz=$(echo "$_dchoice" | sed -n 's/^[a-z]*-\\([0-9]*\)$/\1/p')
+_dhz=$(echo "$_dchoice" | sed -n 's/^[a-z]*-\([0-9]*\)$/\1/p')
 case "$_dhz" in
-  120|132|144|156|165)
+  120|132|144|165)
     [ -f "$XBT/dtbo/${_dhz}hz.dtb" ] && _dlimg="$XBT/dtbo/${_dhz}hz.dtb" ;;
 esac
 if [ -n "$_dlimg" ]; then
@@ -614,7 +614,7 @@ echo "  inf 节流时间戳 : $([ -f $XBT/state/inf_settle_ts ] && echo 存在 |
 echo "  inf 失败计数   : $(cat $XBT/state/inf_settle_fail 2>/dev/null || echo 无)"
 echo "  --- 模块写入次数统计（本次开机）---"
 
-_logf=${LOG:-/data/local/tmp/xt_toolbox.log}
+_logf=${LOG:-/data/local/tmp/battery_tune_mc.log}
 _ln_total=$(wc -l < "$_logf" 2>/dev/null)
 case "$_ln_total" in ''|*[!0-9]*) _ln_total=0 ;; esac
 _ln_boot=$(grep -an 'service: start' "$_logf" 2>/dev/null | tail -1 | cut -d: -f1)
@@ -653,7 +653,7 @@ dmesg 2>/dev/null | grep -aiE 'charger|chg_|usb.*(insert|remove|connect)|cc_orie
   || echo "  （无）"
 echo "模块充电日志（最近 6 条）:"
 grep -aE 'charge_guard: (charger event|inf)' \
-  "${LOG:-/data/local/tmp/xt_toolbox.log}" 2>/dev/null | tail -n 6 | sed 's/^/  /' \
+  "${LOG:-/data/local/tmp/battery_tune_mc.log}" 2>/dev/null | tail -n 6 | sed 's/^/  /' \
   || echo "  （无）"
 
 echo "--- typec / PD 端口状态（有则能看出连接与角色）---"

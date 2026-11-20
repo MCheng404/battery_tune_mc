@@ -4,210 +4,231 @@ XBT=/data/adb/modules/battery_tune_mc
 . $XBT/scripts/common.sh
 FP=/data/adb/modules/freepps
 FP_FREE=$FP/free
+FP_PROP=$FP/module.prop
 FP_BIN=$XBT/bin/freepps
+QCOM=/sys/class/qcom-battery/pd_verifed
+MTK=/sys/class/Charging_Adapter/pd_adapter/usbpd_verifed
+
+is_foreign() {
+  [ -f "$FP_PROP" ] || return 1
+  grep -q '^id=freepps_rt$' "$FP_PROP" && return 1
+  [ -f "$FP/service.sh" ] || [ -f "$FP/post-fs-data.sh" ]
+}
 
 ensure_dir() {
-  mkdir -p $FP 2>/dev/null
-  [ -f $FP_FREE ] || printf '0' > $FP_FREE 2>/dev/null
-
-  if [ -f "$FP/module.prop" ]; then
-    if [ ! -f "$FP/post-fs-data.sh" ] && [ ! -f "$FP/service.sh" ]; then
-      rm -f "$FP/module.prop" 2>/dev/null
-      log "freepps: removed self-created ghost module.prop"
-    else
-      log "freepps: detected REAL FreePPS module at $FP -> left untouched"
-    fi
+  if is_foreign; then
+    log "freepps: real FreePPS module detected at $FP, yielding"
+    return 1
   fi
+  mkdir -p "$FP" 2>/dev/null
+  [ -f "$FP_FREE" ] || printf '0' > "$FP_FREE" 2>/dev/null
+  return 0
+}
+
+write_prop() {
+  is_foreign && return 1
+  cat > "$FP_PROP" <<'EOF'
+id=freepps_rt
+name=PPS Runtime
+version=1
+versionCode=1
+author=battery_tune_mc
+description=Internal PPS runtime, started on demand
+EOF
+  chmod 644 "$FP_PROP" 2>/dev/null
+}
+
+remove_prop() {
+  [ -f "$FP_PROP" ] || return 0
+  grep -q '^id=freepps_rt$' "$FP_PROP" || return 0
+  rm -f "$FP_PROP" 2>/dev/null
+}
+
+freepps_pids() {
+  for _p in $(xbt_pids 'battery_tune_mc/bin/[f]reepps' "$FP_BIN"); do
+    pid_alive "$_p" "$FP_BIN" || continue
+    [ "$(readlink "/proc/$_p/exe" 2>/dev/null)" = "$FP_BIN" ] && echo "$_p"
+  done
 }
 
 is_running() {
-
-  if command -v pgrep >/dev/null 2>&1; then
-    pgrep -f 'battery_tune_mc/bin/[f]reepps' >/dev/null 2>&1 && return 0
-    return 1
-  fi
-
-  for _p in /proc/[0-9]*; do
-    case "$(timeout 1 cat $_p/comm 2>/dev/null)" in
-      freepps)
-        case "$(timeout 1 cat "$_p/cmdline" 2>/dev/null | tr '\0' ' ')" in
-          *battery_tune_mc/bin/freepps*) return 0 ;;
-        esac
-        ;;
-    esac
+  for _p in $(freepps_pids); do
+    [ -n "$_p" ] && return 0
   done
   return 1
 }
 
-restore_node() {
-  _q=/sys/class/qcom-battery/pd_verifed
-  _c=/sys/class/Charging_Adapter/pd_adapter/usbpd_verifed
-
-  printf '0' > $FP_FREE 2>/dev/null
-
-  _need=0
-  for _n in $_q $_c; do
+node_one() {
+  for _n in "$QCOM" "$MTK"; do
     [ -e "$_n" ] || continue
-    [ "$(cat "$_n" 2>/dev/null)" = "1" ] && _need=1
+    [ "$(cat "$_n" 2>/dev/null)" = "1" ] && return 0
   done
-  [ "$_need" = "0" ] && return 0
+  return 1
+}
 
-  if is_running; then
-    _i=0
-    while [ $_i -lt 6 ]; do
-      _i=$((_i + 1))
-      sleep 1
-      _still=0
-      for _n in $_q $_c; do
-        [ -e "$_n" ] || continue
-        [ "$(cat "$_n" 2>/dev/null)" = "1" ] && _still=1
-      done
-      [ "$_still" = "0" ] && return 0
-    done
-  fi
-
+set_nodes() {
+  _want="$1"
   _ok=0
-  for _n in $_q $_c; do
+  for _n in "$QCOM" "$MTK"; do
     [ -e "$_n" ] || continue
+    [ "$(cat "$_n" 2>/dev/null)" = "$_want" ] && continue
     chmod 664 "$_n" 2>/dev/null
-    echo 0 > "$_n" 2>/dev/null && _ok=1
+    echo "$_want" > "$_n" 2>/dev/null && _ok=1
   done
-  [ "$_ok" = "1" ] && log "freepps: pd_verifed force-restored to 0 (process was not running)"
+  [ "$_ok" = "1" ] && log "freepps: node write $_want done"
   return 0
 }
 
-kill_legacy() {
-  if command -v pgrep >/dev/null 2>&1; then
-    for _k in $(timeout 5 pgrep -f 'FreePPS/bin/[F]reePPS' 2>/dev/null); do
-      kill -9 "$_k" 2>/dev/null
-    done
-    return
+wait_ready() {
+  _i=0
+  while [ "$_i" -lt 8 ]; do
+    node_one && return 0
+    sleep 0.2
+    _i=$((_i + 1))
+  done
+  return 1
+}
+
+start_engine() {
+  if is_foreign; then
+    echo "检测到独立 FreePPS 模块，已让位，请改用该模块"
+    return 1
+  fi
+  ensure_dir || return 1
+  write_prop || return 1
+  printf '1' > "$FP_FREE" 2>/dev/null
+
+  if ! is_running; then
+    ( setsid "$FP_BIN" >/dev/null 2>&1 < /dev/null & )
+    sleep 0.5
+  fi
+  if ! is_running; then
+    ( setsid "$FP_BIN" >/dev/null 2>&1 < /dev/null & )
+    sleep 0.5
+  fi
+  if ! is_running; then
+    remove_prop
+    log "freepps: ERROR not running after retry"
+    echo "警告: FreePPS 进程启动失败，请查看模块日志"
+    return 1
   fi
 
-  for _p in /proc/[0-9]*; do
-    case "$(timeout 1 cat $_p/comm 2>/dev/null)" in
-      FreePPS)
-        case "$(timeout 1 cat "$_p/cmdline" 2>/dev/null | tr '\0' ' ')" in
-          */FreePPS/bin/FreePPS*) kill -9 "${_p#/proc/}" 2>/dev/null ;;
-        esac
-        ;;
-    esac
+  wait_ready
+  set_nodes 1
+  remove_prop
+  log "freepps: started qcom=$(cat "$QCOM" 2>/dev/null) mtk=$(cat "$MTK" 2>/dev/null)"
+  if node_one; then
+    echo "公版PPS已开启（节点已写入，拔插充电器后生效）"
+    return 0
+  fi
+  echo "警告: pd_verifed 写入失败，PPS 无法解锁（检查节点权限/SELinux）"
+  return 1
+}
+
+stop_engine() {
+  for _p in $(freepps_pids); do
+    kill -TERM "$_p" 2>/dev/null
+  done
+  sleep 0.4
+  for _p in $(freepps_pids); do
+    kill -9 "$_p" 2>/dev/null
   done
 }
 
-ensure_running() {
-  [ -x $FP_BIN ] || { echo "二进制缺失: $FP_BIN"; return 1; }
+restore_node() {
+  stop_engine
+  printf '0' > "$FP_FREE" 2>/dev/null
+  set_nodes 0
+  remove_prop
+  log "freepps: restored qcom=$(cat "$QCOM" 2>/dev/null) mtk=$(cat "$MTK" 2>/dev/null)"
+}
 
-  _lk=$XBT/state/.freepps.lock
-  _owns=""
-  if [ -d "$_lk" ]; then
-    _age=$(( $(date +%s) - $(stat -c %Y "$_lk" 2>/dev/null || echo 0) ))
-    [ "$_age" -gt 30 ] && rm -rf "$_lk" 2>/dev/null
-  fi
-  if mkdir "$_lk" 2>/dev/null; then
-    _owns=1
-  else
-
-    sleep 0.4
-    if is_running; then return 0; fi
-    rm -rf "$_lk" 2>/dev/null
-    if mkdir "$_lk" 2>/dev/null; then _owns=1; else return 0; fi
-  fi
-  trap '[ -n "$_owns" ] && rmdir "$_lk" 2>/dev/null' EXIT
-  if ! is_running; then
-    ( setsid $FP_BIN >/dev/null 2>&1 < /dev/null & )
-    log "freepps: process started"
-    echo "FreePPS 进程已启动"
-  fi
-  sleep 0.3
-  if ! is_running; then
-
-    ( setsid $FP_BIN >/dev/null 2>&1 < /dev/null & )
-    sleep 0.3
-    if is_running; then
-      log "freepps: process restarted (2nd try)"
-      echo "FreePPS 进程已启动（重试）"
-    else
-      log "freepps: ERROR process not running after retry"
-      echo "警告: FreePPS 进程启动失败，请查看模块日志"
-    fi
-  fi
-  rmdir "$_lk" 2>/dev/null
+kill_legacy() {
+  xbt_kill 'FreePPS/bin/[F]reePPS' 'FreePPS/bin/FreePPS'
 }
 
 case "$1" in
   status)
     _en=$(cfg_get freepps 0)
     if [ "$_en" = "1" ]; then _ens="开启"; else _ens="关闭"; fi
-    _fv=$(cat $FP_FREE 2>/dev/null)
+    _fv=$(cat "$FP_FREE" 2>/dev/null)
     case "$_fv" in
       1) _fs="锁定PPS支持" ;;
       0) _fs="已暂停" ;;
       *) _fs="未初始化" ;;
     esac
     if is_running; then _rs="运行中"; else _rs="未运行"; fi
+    if is_foreign; then _fs="检测到独立 FreePPS 模块"; fi
     echo "总开关 : $_ens (settings freepps=$_en)"
     echo "运行时 : $_fs (free=${_fv:-无})"
     echo "进程   : $_rs"
-    echo "节点   : pd_verifed=$(cat /sys/class/qcom-battery/pd_verifed 2>/dev/null)"
-    _pv=$(cat /sys/class/qcom-battery/pd_verifed 2>/dev/null)
+    echo "节点   : qcom=$(cat "$QCOM" 2>/dev/null) mtk=$(cat "$MTK" 2>/dev/null)"
+    _pv=$(cat "$QCOM" 2>/dev/null)
     if [ "$_en" = "0" ] && [ "$_pv" = "1" ]; then
-      echo "警告   : ⚠ 已关闭但 pd_verifed 仍为 1（残留）→ 执行 freepps.sh restore 还原"
+      echo "提示   : 已关闭但 qcom 节点仍为 1，执行 freepps.sh restore 还原"
     fi
     ;;
   on)
-    cfg_set freepps 1
-    ensure_dir
-    printf '1' > $FP_FREE 2>/dev/null
+    if is_foreign; then
+      echo "检测到独立 FreePPS 模块，已让位，请改用该模块"
+      exit 1
+    fi
     kill_legacy
-    ensure_running
-    log "freepps: ON"
-    echo "公版PPS解锁已开启（含金标动画；切换/重插充电器后生效）"
+    start_engine
+    _rc=$?
+    if [ "$_rc" = "0" ]; then
+      cfg_set freepps 1
+    else
+      cfg_set freepps 0
+      restore_node
+    fi
+    log "freepps: ON rc=$_rc"
+    exit "$_rc"
     ;;
   off)
     cfg_set freepps 0
-    ensure_dir
-    printf '0' > $FP_FREE 2>/dev/null
     restore_node
     log "freepps: OFF"
-    echo "公版PPS解锁已关闭（验证节点已还原；进程保留待命）"
+    echo "公版PPS已关闭（节点已还原）"
     ;;
   boot)
     if [ "$(cfg_get freepps 0)" = "1" ]; then
-      ensure_dir
-      printf '1' > $FP_FREE 2>/dev/null
       kill_legacy
-      ensure_running
+      start_engine
       log "freepps: boot -> locked"
     else
-      if [ -d $FP ]; then
-        ensure_dir
-
-        restore_node
+      ensure_dir
+      if [ "$(cat /sys/class/power_supply/battery/status 2>/dev/null)" = "Discharging" ]; then
+        node_one && set_nodes 0
       fi
+      remove_prop
       log "freepps: boot -> paused"
     fi
     ;;
   restore)
-
     ensure_dir
     restore_node
-    echo "验证节点已还原: pd_verifed=$(cat /sys/class/qcom-battery/pd_verifed 2>/dev/null)"
-    log "freepps: restore node -> $(cat /sys/class/qcom-battery/pd_verifed 2>/dev/null)"
+    echo "验证节点已还原: qcom=$(cat "$QCOM" 2>/dev/null) mtk=$(cat "$MTK" 2>/dev/null)"
     ;;
   ensure)
-    ensure_dir
+    ensure_dir || exit 0
     if [ "$(cfg_get freepps 0)" = "1" ]; then
-      [ "$(cat $FP_FREE 2>/dev/null)" = "1" ] || printf '1' > $FP_FREE 2>/dev/null
-      ensure_running
-    else
-      if [ "$(cat $FP_FREE 2>/dev/null)" != "0" ]; then
-        restore_node
+      if is_running; then
+        if [ "$(cat "$FP_FREE" 2>/dev/null)" != "1" ]; then
+          start_engine
+        else
+          node_one || set_nodes 1
+        fi
       else
-
-        _pv=$(cat /sys/class/qcom-battery/pd_verifed 2>/dev/null)
-        [ "$_pv" = "1" ] && restore_node
+        start_engine
       fi
+    else
+      if is_running; then stop_engine; fi
+      [ "$(cat "$FP_FREE" 2>/dev/null)" = "0" ] || printf '0' > "$FP_FREE" 2>/dev/null
+      if [ "$(cat /sys/class/power_supply/battery/status 2>/dev/null)" = "Discharging" ]; then
+        node_one && set_nodes 0
+      fi
+      remove_prop
     fi
     ;;
   *)

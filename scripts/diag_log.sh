@@ -207,7 +207,7 @@ case "$1" in
       echo "  5. 拔插充电器后是否恢复？"
     } > "$_dst/采集说明_请补充信息.txt" 2>/dev/null
 
-    cp -f "${LOG:-/data/local/tmp/xt_toolbox.log}" "$_dst/运行主日志.log" 2>/dev/null
+    cp -f "${LOG:-/data/local/tmp/battery_tune_mc.log}" "$_dst/运行主日志.log" 2>/dev/null
 
     cp -f "$DIR"/diag_*.log "$_dst"/ 2>/dev/null
 

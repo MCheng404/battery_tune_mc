@@ -20,7 +20,7 @@ PROF="$XBT/state/apl_profile.$DEV.kv"
 APL_LOG="$XBT/state/apl.csv"
 WARMUP_S=90
 
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') apl: $*" >> /data/local/tmp/xt_toolbox.log 2>/dev/null; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') apl: $*" >> /data/local/tmp/battery_tune_mc.log 2>/dev/null; }
 ap()  { echo "$1" > "$TGT.tmp" 2>/dev/null && mv -f "$TGT.tmp" "$TGT" 2>/dev/null; }
 now() { date +%s; }
 

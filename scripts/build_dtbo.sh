@@ -8,13 +8,29 @@ DTB="$1"; OUT="$2"; TARGET="$3"
 [ -z "$DTB" ] || [ -z "$OUT" ] && { echo "用法: sh build_dtbo.sh <dtb> <out.img> [size]"; exit 2; }
 [ -f "$DTB" ] || { echo "!! 输入 DTB 不存在: $DTB"; exit 1; }
 
+part_size64() {
+  _ps_dev="$1"
+  _ps_sz=$(blockdev --getsize64 "$_ps_dev" 2>/dev/null)
+  case "$_ps_sz" in
+    ''|*[!0-9]*) ;;
+    *) echo "$_ps_sz"; return 0 ;;
+  esac
+  _ps_node=$(basename "$(readlink -f "$_ps_dev" 2>/dev/null)" 2>/dev/null)
+  [ -n "$_ps_node" ] || return 1
+  _ps_sec=$(cat "/sys/class/block/$_ps_node/size" 2>/dev/null)
+  case "$_ps_sec" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  echo $((_ps_sec * 512))
+}
+
 if [ -z "$TARGET" ]; then
   _slot=$(getprop ro.boot.slot_suffix 2>/dev/null); _slot=${_slot#_}
   [ -z "$_slot" ] && _slot=b
-  TARGET=$(blockdev --getsize64 /dev/block/by-name/dtbo_$_slot 2>/dev/null)
+  TARGET=$(part_size64 "/dev/block/by-name/dtbo_$_slot")
 fi
-[ -z "$TARGET" ] && TARGET=$(blockdev --getsize64 /dev/block/by-name/dtbo_b 2>/dev/null)
-[ -z "$TARGET" ] && TARGET=$(blockdev --getsize64 /dev/block/by-name/dtbo 2>/dev/null)
+[ -z "$TARGET" ] && TARGET=$(part_size64 /dev/block/by-name/dtbo_b)
+[ -z "$TARGET" ] && TARGET=$(part_size64 /dev/block/by-name/dtbo)
 case "$TARGET" in ''|*[!0-9]*) TARGET=25165824 ;; esac
 
 _SZ=$(stat -c %s "$DTB" 2>/dev/null) || { echo "!! 读取 DTB 大小失败"; exit 1; }
